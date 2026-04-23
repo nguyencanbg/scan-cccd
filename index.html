@@ -1,67 +1,90 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="utf-8">
   <title>Scan CCCD</title>
-
-  <script src="https://unpkg.com/html5-qrcode"></script>
+  <script src="https://unpkg.com/@zxing/library@latest"></script>
 
   <style>
-    body { margin:0; background:black; color:white; text-align:center; }
-    #reader { width:100%; }
+    body {
+      margin: 0;
+      background: black;
+      text-align: center;
+      color: white;
+      font-family: Arial;
+    }
+
+    video {
+      width: 100%;
+      height: auto;
+    }
+
     .btn-close {
       position: fixed;
       top: 20px;
       right: 20px;
       background: red;
       color: white;
-      border: none;
       padding: 10px 15px;
+      border: none;
       border-radius: 10px;
+      font-size: 16px;
+    }
+
+    .guide {
+      position: fixed;
+      bottom: 20px;
+      width: 100%;
+      font-size: 14px;
+      opacity: 0.8;
     }
   </style>
 </head>
 
 <body>
 
+<video id="video" autoplay muted playsinline></video>
+
 <button class="btn-close" onclick="window.close()">Đóng</button>
 
-<h3>📷 Quét mã QR CCCD</h3>
-
-<div id="reader"></div>
+<div class="guide">
+  📷 Đưa mã QR CCCD vào giữa màn hình
+</div>
 
 <script>
-  const urlParams = new URLSearchParams(window.location.search);
-  const field = urlParams.get("field") || "QR";
+  const codeReader = new ZXing.BrowserMultiFormatReader();
 
-  function onScanSuccess(decodedText) {
-    if (window.opener) {
-      window.opener.postMessage({
-        field: field,
-        value: decodedText
-      }, "*");
+  async function startScan() {
+    try {
+      const devices = await codeReader.listVideoInputDevices();
+
+      const backCamera = devices.find(d =>
+        d.label.toLowerCase().includes("back") ||
+        d.label.toLowerCase().includes("rear")
+      ) || devices[0];
+
+      codeReader.decodeFromVideoDevice(
+        backCamera.deviceId,
+        'video',
+        (result, err) => {
+          if (result) {
+            console.log("QR:", result.text);
+
+            // trả dữ liệu về web cha
+            window.opener.postMessage(result.text, "*");
+
+            codeReader.reset();
+            window.close();
+          }
+        }
+      );
+
+    } catch (err) {
+      alert("Không mở được camera: " + err);
     }
-
-    alert("Quét thành công!");
-    setTimeout(() => window.close(), 500);
   }
 
-  function onScanError(err) {}
-
-  const html5QrCode = new Html5Qrcode("reader");
-
-  Html5Qrcode.getCameras().then(devices => {
-    if (devices.length) {
-      html5QrCode.start(
-        { facingMode: "environment" },
-        { fps: 10, qrbox: 250 },
-        onScanSuccess,
-        onScanError
-      );
-    }
-  }).catch(err => {
-    alert("Không mở được camera: " + err);
-  });
+  startScan();
 </script>
 
 </body>
