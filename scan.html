@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Scan CCCD</title>
+
+  <script src="https://unpkg.com/html5-qrcode"></script>
+
+  <style>
+    body { margin:0; background:black; color:white; text-align:center; }
+    #reader { width:100%; }
+    .btn-close {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: red;
+      color: white;
+      border: none;
+      padding: 10px 15px;
+      border-radius: 10px;
+    }
+  </style>
+</head>
+
+<body>
+
+<button class="btn-close" onclick="window.close()">Đóng</button>
+
+<h3>📷 Quét mã QR CCCD</h3>
+
+<div id="reader"></div>
+
+<script>
+  const urlParams = new URLSearchParams(window.location.search);
+  const field = urlParams.get("field") || "QR";
+
+  function onScanSuccess(decodedText) {
+    if (window.opener) {
+      window.opener.postMessage({
+        field: field,
+        value: decodedText
+      }, "*");
+    }
+
+    alert("Quét thành công!");
+    setTimeout(() => window.close(), 500);
+  }
+
+  function onScanError(err) {}
+
+  const html5QrCode = new Html5Qrcode("reader");
+
+  Html5Qrcode.getCameras().then(devices => {
+    if (devices.length) {
+      html5QrCode.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: 250 },
+        onScanSuccess,
+        onScanError
+      );
+    }
+  }).catch(err => {
+    alert("Không mở được camera: " + err);
+  });
+</script>
+
+</body>
+</html>
