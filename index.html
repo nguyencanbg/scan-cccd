@@ -4,7 +4,6 @@
   <meta charset="utf-8">
   <title>Scan CCCD</title>
 
-  <!-- THƯ VIỆN QUÉT QR MẠNH NHẤT -->
   <script src="https://unpkg.com/@zxing/library@latest"></script>
 
   <style>
@@ -19,6 +18,19 @@
     video {
       width: 100%;
       height: auto;
+    }
+
+    /* KHUNG QUÉT */
+    .scan-box {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      width: 260px;
+      height: 260px;
+      transform: translate(-50%, -50%);
+      border: 3px solid #00ffcc;
+      border-radius: 10px;
+      box-shadow: 0 0 15px #00ffcc;
     }
 
     .btn-close {
@@ -46,15 +58,14 @@
 
 <body>
 
-<!-- CAMERA -->
 <video id="video" autoplay muted playsinline></video>
 
-<!-- NÚT ĐÓNG -->
+<div class="scan-box"></div>
+
 <button class="btn-close" onclick="window.close()">Đóng</button>
 
-<!-- HƯỚNG DẪN -->
 <div class="guide">
-  📷 Đưa mã QR CCCD vào giữa màn hình
+  📷 Đưa mã QR CCCD vào trong khung
 </div>
 
 <script>
@@ -62,55 +73,40 @@
 
   async function startScan() {
     try {
-      console.log("Đang mở camera...");
+      const constraints = {
+        video: {
+          facingMode: { ideal: "environment" },
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        }
+      };
 
-      const devices = await codeReader.listVideoInputDevices();
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      const video = document.getElementById("video");
+      video.srcObject = stream;
 
-      if (!devices || devices.length === 0) {
-        alert("Không tìm thấy camera");
-        return;
-      }
+      video.onloadedmetadata = () => {
+        video.play();
+      };
 
-      console.log("Danh sách camera:", devices);
-
-      // Ưu tiên camera sau
-      let selectedDeviceId = devices[0].deviceId;
-
-      const backCamera = devices.find(d =>
-        d.label.toLowerCase().includes("back") ||
-        d.label.toLowerCase().includes("rear")
-      );
-
-      if (backCamera) {
-        selectedDeviceId = backCamera.deviceId;
-      }
-
-      console.log("Dùng camera:", selectedDeviceId);
-
-      codeReader.decodeFromVideoDevice(
-        selectedDeviceId,
-        'video',
+      codeReader.decodeFromVideoElement(
+        video,
         (result, err) => {
 
           if (result) {
-            console.log("ĐÃ QUÉT ĐƯỢC:", result.text);
-
-            // 👉 TEST: HIỂN THỊ CHUỖI QR
             alert("QR đọc được:\n\n" + result.text);
 
-            // Dừng camera
             codeReader.reset();
           }
 
           if (err && !(err instanceof ZXing.NotFoundException)) {
-            console.error("Lỗi scan:", err);
+            console.error(err);
           }
         }
       );
 
     } catch (err) {
       alert("Không mở được camera: " + err);
-      console.error(err);
     }
   }
 
