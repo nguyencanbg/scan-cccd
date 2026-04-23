@@ -67,8 +67,9 @@
         backCamera.deviceId,
         'video',
         (result, err) => {
-          if (result) {
-            console.log("QR:", result.text);
+         if (result) {
+  alert("QR đọc được: " + result.text);
+}
 
             // trả dữ liệu về web cha
             window.opener.postMessage(result.text, "*");
