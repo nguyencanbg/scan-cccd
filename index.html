@@ -1,185 +1,213 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>Quét mã QR CCCD - Nhanh & Chính xác</title>
-    <style>
-        body { ... }
-        #reader { ... }
-        button { ... }
-        .info { ... }
-        .loading { ... }
-        select { ... }
-        /* Có thể thêm style cho khung hướng dẫn */
-        .scan-region {
-            position: absolute;
-            border: 2px solid rgba(0, 255, 0, 0.5);
-            box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.5);
-            pointer-events: none;
-        }
-    </style>
-    <script src="https://unpkg.com/html5-qrcode"></script>
-    <script src="https://unpkg.com/jsqr@1.4.0/dist/jsQR.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+  <title>Quét QR CCCD - Tốc độ cao</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      background: #000;
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+    .header {
+      text-align: center;
+      padding: 12px;
+      background: rgba(0,0,0,0.7);
+      color: white;
+      font-size: 1.2rem;
+      font-weight: bold;
+      z-index: 10;
+    }
+    .camera-wrapper {
+      flex: 1;
+      position: relative;
+      background: #000;
+      overflow: hidden;
+    }
+    #qr-reader {
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+    #qr-reader video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .scan-region {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 70%;
+      max-width: 280px;
+      height: 70%;
+      max-height: 280px;
+      border: 2px solid #4caf50;
+      border-radius: 20px;
+      box-shadow: 0 0 0 100vmax rgba(0,0,0,0.5);
+      pointer-events: none;
+      z-index: 10;
+    }
+    .controls {
+      padding: 12px;
+      background: rgba(0,0,0,0.8);
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      z-index: 10;
+    }
+    button, select {
+      background: #d90429;
+      border: none;
+      color: white;
+      padding: 8px 20px;
+      border-radius: 30px;
+      font-size: 14px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    select {
+      background: #333;
+    }
+    .info {
+      text-align: center;
+      padding: 8px;
+      font-size: 12px;
+      background: rgba(0,0,0,0.6);
+      color: #ccc;
+    }
+    .loading {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(0,0,0,0.8);
+      padding: 12px 20px;
+      border-radius: 30px;
+      color: white;
+      z-index: 20;
+      display: none;
+    }
+  </style>
+  <script src="https://unpkg.com/html5-qrcode"></script>
 </head>
 <body>
-    <h3>📷 Quét mã QR trên CCCD</h3>
-    <div id="reader"></div>
-    <div>
-        <select id="cameraSelect" style="display: none;"></select>
-    </div>
-    <div class="loading" id="loadingMsg">⏳ Đang khởi tạo camera...</div>
-    <button onclick="window.close()">Đóng</button>
-    <div class="info">
-        ✅ Đưa mã QR vào giữa khung hình<br>
-        🔄 Quét tự động, kết quả sẽ gửi về form
-    </div>
+  <div class="header">📷 QUÉT MÃ QR CCCD</div>
+  <div class="camera-wrapper">
+    <div id="qr-reader"></div>
+    <div class="scan-region"></div>
+  </div>
+  <div class="controls">
+    <select id="cameraSelect" style="display: none;"></select>
+    <button id="closeBtn">Đóng</button>
+  </div>
+  <div class="info">✅ Đưa mã QR vào khung xanh · 🔄 Tự động quét</div>
+  <div id="loadingMsg" class="loading">⏳ Đang khởi tạo camera...</div>
 
-    <script>
-        // --- Các biến toàn cục ---
-        let html5QrCode = null;
-        let currentCameraId = null;
-        let animationId = null;
-        let lastTimestamp = 0;
-        const FRAME_INTERVAL = 100; // ms
-        
-        // --- Các biến cho BarcodeDetector ---
-        let videoElement = null;
-        let canvasElement = null;
-        let canvasContext = null;
-        let detector = null;
-        let useNativeDetector = false;
+  <script>
+    let html5QrCode = null;
+    let isScanning = true;
+    let currentCameraId = null;
 
-        // --- Hàm khởi tạo chính ---
-        async function initCamera() {
-            document.getElementById('loadingMsg').style.display = 'block';
-            try {
-                const devices = await Html5Qrcode.getCameras();
-                if (!devices || devices.length === 0) throw new Error("Không tìm thấy camera.");
-                
-                let rearCam = devices.find(dev => dev.label.toLowerCase().includes('back') || dev.label.toLowerCase().includes('rear'));
-                if (!rearCam && devices.length > 1) rearCam = devices[devices.length - 1];
-                const selectedId = rearCam ? rearCam.id : devices[0].id;
-                currentCameraId = selectedId;
-                
-                // Hiển thị dropdown nếu có nhiều camera
-                if (devices.length > 1) {
-                    const select = document.getElementById('cameraSelect');
-                    select.style.display = 'inline-block';
-                    select.innerHTML = '';
-                    devices.forEach(dev => {
-                        const option = document.createElement('option');
-                        option.value = dev.id;
-                        option.text = dev.label || (dev.id.includes('back') ? 'Camera sau' : 'Camera trước');
-                        if (dev.id === selectedId) option.selected = true;
-                        select.appendChild(option);
-                    });
-                    select.onchange = () => {
-                        if (animationId) cancelAnimationFrame(animationId);
-                        if (videoElement && videoElement.srcObject) {
-                            videoElement.srcObject.getTracks().forEach(track => track.stop());
-                        }
-                        currentCameraId = select.value;
-                        startScanning(currentCameraId);
-                    };
-                }
-                await startScanning(selectedId);
-            } catch (err) {
-                console.error("Lỗi khởi tạo camera:", err);
-                document.getElementById('loadingMsg').innerHTML = "❌ Lỗi truy cập camera: " + err.message;
-                document.getElementById('loadingMsg').style.display = 'block';
-            }
-        }
+    const qrReaderDiv = document.getElementById('qr-reader');
+    const cameraSelect = document.getElementById('cameraSelect');
+    const closeBtn = document.getElementById('closeBtn');
+    const loadingMsg = document.getElementById('loadingMsg');
 
-        // --- Bắt đầu quét với một camera ID cụ thể ---
-        async function startScanning(cameraId) {
-            document.getElementById('loadingMsg').style.display = 'block';
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: cameraId } } });
-                const videoTrack = stream.getVideoTracks()[0];
-                
-                if (!videoElement) {
-                    videoElement = document.createElement('video');
-                    videoElement.setAttribute('playsinline', '');
-                }
-                videoElement.srcObject = stream;
-                await videoElement.play();
-                
-                // Khởi tạo canvas
-                if (!canvasElement) {
-                    canvasElement = document.createElement('canvas');
-                    canvasContext = canvasElement.getContext('2d');
-                }
-                canvasElement.width = videoElement.videoWidth;
-                canvasElement.height = videoElement.videoHeight;
-                
-                // Khởi tạo BarcodeDetector nếu có
-                if ('BarcodeDetector' in window) {
-                    detector = new BarcodeDetector({ formats: ['qr_code'] });
-                    useNativeDetector = true;
-                } else {
-                    useNativeDetector = false;
-                    console.warn("Trình duyệt không hỗ trợ BarcodeDetector, sử dụng jsQR dự phòng.");
-                }
-                
-                // Bắt đầu vòng lặp xử lý
-                if (animationId) cancelAnimationFrame(animationId);
-                lastTimestamp = 0;
-                animationId = requestAnimationFrame(processFrame);
-                document.getElementById('loadingMsg').style.display = 'none';
-            } catch (err) {
-                console.error("Lỗi khởi động camera:", err);
-                document.getElementById('loadingMsg').innerHTML = "❌ Không thể khởi động camera. Hãy kiểm tra quyền truy cập hoặc thử lại.";
-                document.getElementById('loadingMsg').style.display = 'block';
-            }
-        }
-        
-        // --- Xử lý từng khung hình ---
-        async function processFrame(now) {
-            if (now - lastTimestamp >= FRAME_INTERVAL) {
-                lastTimestamp = now;
-                if (videoElement && canvasContext) {
-                    canvasContext.drawImage(videoElement, 0, 0, canvasElement.width, canvasElement.height);
-                    const imageData = canvasContext.getImageData(0, 0, canvasElement.width, canvasElement.height);
-                    
-                    let decodedText = null;
-                    if (useNativeDetector && detector) {
-                        try {
-                            const barcodes = await detector.detect(imageData);
-                            if (barcodes.length > 0) decodedText = barcodes[0].rawValue;
-                        } catch (err) { console.warn(err); }
-                    } 
-                    
-                    if (!decodedText) {
-                        // Dự phòng jsQR
-                        const code = jsQR(imageData.data, canvasElement.width, canvasElement.height);
-                        if (code) decodedText = code.data;
-                    }
-                    
-                    if (decodedText) {
-                        // Tìm thấy QR code, gửi kết quả
-                        if (animationId) cancelAnimationFrame(animationId);
-                        if (videoElement && videoElement.srcObject) {
-                            videoElement.srcObject.getTracks().forEach(track => track.stop());
-                        }
-                        if (window.opener) {
-                            window.opener.postMessage({ type: 'qr-scanned', value: decodedText }, '*');
-                            alert("✅ Quét thành công!");
-                            window.close();
-                        } else {
-                            alert("Lỗi: Không tìm thấy cửa sổ cha.");
-                        }
-                        return;
-                    }
-                }
-            }
-            animationId = requestAnimationFrame(processFrame);
-        }
+    async function stopScanner() {
+      if (html5QrCode && html5QrCode.isScanning) {
+        try { await html5QrCode.stop(); } catch(e) { console.warn(e); }
+      }
+      html5QrCode = null;
+    }
 
-        // Bắt đầu khi trang tải xong
-        window.onload = () => {
-            initCamera();
+    async function startScanner(cameraId) {
+      await stopScanner();
+      loadingMsg.style.display = 'flex';
+      try {
+        html5QrCode = new Html5Qrcode("qr-reader", { verbose: false });
+        const config = {
+          fps: 30,
+          qrbox: { width: 250, height: 250 },
+          aspectRatio: 1.0,
+          showTorchButtonIfSupported: true,
+          rememberLastUsedCamera: true
         };
-    </script>
+        await html5QrCode.start(cameraId, config, onScanSuccess, onScanError);
+        loadingMsg.style.display = 'none';
+      } catch (err) {
+        console.error(err);
+        loadingMsg.innerHTML = "❌ Lỗi camera: " + err.message;
+        loadingMsg.style.display = 'flex';
+      }
+    }
+
+    function onScanSuccess(decodedText) {
+      if (!isScanning) return;
+      isScanning = false;
+      stopScanner().then(() => {
+        if (window.opener && !window.opener.closed) {
+          window.opener.postMessage({ type: 'qr-scanned', value: decodedText }, '*');
+          alert("✅ Quét thành công!");
+          window.close();
+        } else {
+          alert("Lỗi: Không tìm thấy cửa sổ cha.");
+          isScanning = true;
+        }
+      });
+    }
+
+    function onScanError(errMsg) {
+      // bỏ qua lỗi quét thông thường
+    }
+
+    async function initCamera() {
+      try {
+        const devices = await Html5Qrcode.getCameras();
+        if (!devices.length) throw new Error("Không tìm thấy camera");
+        // Ưu tiên camera sau
+        let rearCam = devices.find(dev => 
+          dev.label.toLowerCase().includes('back') ||
+          dev.label.toLowerCase().includes('rear') ||
+          dev.label.toLowerCase().includes('environment')
+        );
+        if (!rearCam && devices.length > 1) rearCam = devices[devices.length - 1];
+        const selectedId = rearCam ? rearCam.id : devices[0].id;
+        currentCameraId = selectedId;
+
+        if (devices.length > 1) {
+          cameraSelect.style.display = 'inline-block';
+          devices.forEach(dev => {
+            const opt = document.createElement('option');
+            opt.value = dev.id;
+            opt.text = dev.label || (dev.id === selectedId ? 'Camera sau' : 'Camera trước');
+            if (dev.id === selectedId) opt.selected = true;
+            cameraSelect.appendChild(opt);
+          });
+          cameraSelect.onchange = () => {
+            if (html5QrCode && html5QrCode.isScanning) stopScanner();
+            startScanner(cameraSelect.value);
+          };
+        }
+        await startScanner(selectedId);
+      } catch (err) {
+        alert("Lỗi: " + err.message);
+      }
+    }
+
+    closeBtn.onclick = () => window.close();
+    window.onload = initCamera;
+  </script>
 </body>
 </html>
