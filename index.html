@@ -3,28 +3,148 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-  <title>Quét mã QR CCCD</title>
+  <title>Quét mã QR CCCD - Nhanh & Chính xác</title>
   <style>
-    body { font-family: 'Segoe UI', sans-serif; text-align: center; margin: 0; padding: 20px; background: #f0f0f0; }
-    #reader { width: 100%; max-width: 500px; margin: 0 auto; }
-    button { margin-top: 20px; padding: 10px 20px; font-size: 16px; background: #d90429; color: white; border: none; border-radius: 5px; cursor: pointer; }
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      text-align: center;
+      margin: 0;
+      padding: 20px;
+      background: #f0f0f0;
+    }
+    #reader {
+      width: 100%;
+      max-width: 500px;
+      margin: 0 auto;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    }
+    #reader video {
+      width: 100%;
+      height: auto;
+    }
+    button {
+      margin-top: 20px;
+      padding: 10px 24px;
+      font-size: 16px;
+      background: #d90429;
+      color: white;
+      border: none;
+      border-radius: 30px;
+      cursor: pointer;
+      font-weight: bold;
+      transition: 0.2s;
+    }
     button:hover { background: #b00322; }
-    .info { margin-top: 15px; color: #555; font-size: 14px; }
+    .info {
+      margin-top: 15px;
+      color: #555;
+      font-size: 14px;
+    }
+    .loading {
+      margin-top: 20px;
+      color: #d90429;
+      font-weight: bold;
+      display: none;
+    }
+    select {
+      margin-top: 10px;
+      padding: 6px 12px;
+      border-radius: 20px;
+      border: 1px solid #ccc;
+    }
   </style>
   <script src="https://unpkg.com/html5-qrcode"></script>
 </head>
 <body>
-  <h3>📷 Quét mã QR CCCD</h3>
+  <h3>📷 Quét mã QR trên CCCD</h3>
   <div id="reader"></div>
+  <div>
+    <select id="cameraSelect" style="display: none;"></select>
+  </div>
+  <div class="loading" id="loadingMsg">⏳ Đang khởi tạo camera...</div>
   <button onclick="window.close()">Đóng</button>
-  <div class="info">Đưa mã QR vào khung hình, hệ thống sẽ tự động quét và gửi kết quả về form.</div>
+  <div class="info">
+    ✅ Đưa mã QR vào giữa khung hình<br>
+    🔄 Quét tự động, kết quả sẽ gửi về form
+  </div>
+
   <script>
-    let html5QrCode = new Html5Qrcode("reader");
-    const config = { fps: 10, qrbox: { width: 250, height: 250 } };
-    
-    html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess, onScanError);
-    
+    let html5QrCode = null;
+    let currentCameraId = null;
+
+    async function startScanner(cameraId) {
+      if (html5QrCode) {
+        try { await html5QrCode.stop(); } catch(e) {}
+      }
+      html5QrCode = new Html5Qrcode("reader", { 
+        verbose: false,
+        experimentalFeatures: {
+          useBarCodeDetectorIfSupported: true  // tăng tốc nếu trình duyệt hỗ trợ
+        }
+      });
+      
+      const config = {
+        fps: 20,                      // tăng fps để quét nhanh hơn
+        qrbox: { width: 250, height: 250 },
+        aspectRatio: 1.0,
+        showTorchButtonIfSupported: true,   // hỗ trợ đèn flash (nếu có)
+        rememberLastUsedCamera: true
+      };
+      
+      try {
+        await html5QrCode.start(cameraId, config, onScanSuccess, onScanError);
+        document.getElementById('loadingMsg').style.display = 'none';
+      } catch (err) {
+        console.error("Lỗi khởi động camera:", err);
+        document.getElementById('loadingMsg').innerHTML = "❌ Không thể khởi động camera. Hãy kiểm tra quyền truy cập hoặc thử lại.";
+        document.getElementById('loadingMsg').style.display = 'block';
+      }
+    }
+
+    async function initCamera() {
+      document.getElementById('loadingMsg').style.display = 'block';
+      try {
+        const devices = await Html5Qrcode.getCameras();
+        if (!devices || devices.length === 0) {
+          alert("Không tìm thấy camera nào.");
+          return;
+        }
+        // Ưu tiên camera sau (môi trường)
+        let rearCam = devices.find(dev => dev.label.toLowerCase().includes('back') || dev.label.toLowerCase().includes('rear'));
+        if (!rearCam && devices.length > 1) rearCam = devices[devices.length - 1]; // thường camera sau ở cuối
+        const selectedId = rearCam ? rearCam.id : devices[0].id;
+        currentCameraId = selectedId;
+        
+        // Nếu có nhiều camera, hiển thị dropdown để người dùng chọn (tùy chọn)
+        if (devices.length > 1) {
+          const select = document.getElementById('cameraSelect');
+          select.style.display = 'inline-block';
+          devices.forEach(dev => {
+            const option = document.createElement('option');
+            option.value = dev.id;
+            option.text = dev.label || (dev.id.includes('back') ? 'Camera sau' : 'Camera trước');
+            if (dev.id === selectedId) option.selected = true;
+            select.appendChild(option);
+          });
+          select.onchange = () => startScanner(select.value);
+        }
+        
+        await startScanner(selectedId);
+      } catch (err) {
+        console.error("Lỗi lấy danh sách camera:", err);
+        document.getElementById('loadingMsg').innerHTML = "❌ Lỗi truy cập camera: " + err.message;
+        document.getElementById('loadingMsg').style.display = 'block';
+      }
+    }
+
     function onScanSuccess(decodedText) {
+      // Ngăn quét nhiều lần
+      if (html5QrCode) {
+        html5QrCode.stop().catch(e => console.log(e));
+        html5QrCode = null;
+      }
       if (window.opener) {
         window.opener.postMessage({ type: 'qr-scanned', value: decodedText }, '*');
         alert("✅ Quét thành công!");
@@ -33,10 +153,16 @@
         alert("Lỗi: Không tìm thấy cửa sổ cha.");
       }
     }
-    
-    function onScanError(errorMessage) {
+
+    function onScanError(errMsg) {
       // Bỏ qua lỗi quét thông thường
+      // console.log(errMsg);
     }
+
+    // Bắt đầu khi trang tải xong
+    window.onload = () => {
+      initCamera();
+    };
   </script>
 </body>
 </html>
