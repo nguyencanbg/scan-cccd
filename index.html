@@ -1,45 +1,26 @@
-<!DOCTYPE html>
-<html lang="vi">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Quét QR CCCD</title>
-
-  <!-- Thư viện QR -->
-  <script src="https://unpkg.com/html5-qrcode"></script>
-
-  <style>
-    body {
-      font-family: Arial;
-      text-align: center;
-      background: #f5f5f5;
-      padding: 20px;
-    }
-    #qr-reader {
-      width: 100%;
-      max-width: 400px;
-      margin: auto;
-    }
-  </style>
-</head>
-
-<body>
-
-<h2>📷 Quét QR CCCD</h2>
-<div id="qr-reader"></div>
-<p>Đưa mã QR vào khung</p>
-
 <script>
   let qr;
 
   function startScan() {
     qr = new Html5Qrcode("qr-reader");
 
+    const config = {
+      fps: 15,
+      qrbox: function(viewfinderWidth, viewfinderHeight) {
+        let minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+        let size = Math.floor(minEdge * 0.8);
+        return { width: size, height: size };
+      },
+      aspectRatio: 1.0,
+      disableFlip: false
+    };
+
     qr.start(
-      { facingMode: { exact: "environment" } },
-      { fps: 10, qrbox: 250 },
+      { facingMode: "environment" },
+      config,
       (decodedText) => {
-        // gửi dữ liệu về Apps Script
+        console.log("QR đọc được:", decodedText);
+
         if (window.opener) {
           window.opener.postMessage({
             type: "QR_RESULT",
@@ -51,7 +32,10 @@
         qr.stop();
         window.close();
       },
-      () => {}
+      (error) => {
+        // debug (có thể bật nếu cần)
+        // console.log(error);
+      }
     ).catch(err => {
       alert("❌ Không mở được camera: " + err);
     });
@@ -59,6 +43,3 @@
 
   startScan();
 </script>
-
-</body>
-</html>
