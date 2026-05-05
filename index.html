@@ -39,58 +39,64 @@
 
 <div id="qr-reader"></div>
 
-<p>Đưa mã QR CCCD vào khung</p>
+<p>Đưa mã QR vào khung</p>
 
 <div id="result">👉 Kết quả sẽ hiển thị ở đây</div>
 
 <script>
   let qr;
 
-  function startScan() {
+  async function startScan() {
     qr = new Html5Qrcode("qr-reader");
 
-    const config = {
-      fps: 15,
-      qrbox: function(viewfinderWidth, viewfinderHeight) {
-        let minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-        let size = Math.floor(minEdge * 0.8);
-        return { width: size, height: size };
-      },
-      aspectRatio: 1.0,
-      disableFlip: false
-    };
+    try {
+      // 🔥 LẤY DANH SÁCH CAMERA
+      const devices = await Html5Qrcode.getCameras();
 
-    qr.start(
-      { facingMode: "environment" },
-      config,
-      (decodedText) => {
-        console.log("QR:", decodedText);
-
-        // 👉 HIỂN THỊ KẾT QUẢ (để bạn test)
-        document.getElementById("result").innerText = decodedText;
-
-        // 👉 GỬI VỀ APPS SCRIPT (khi tích hợp)
-        if (window.opener) {
-          window.opener.postMessage({
-            type: "QR_RESULT",
-            data: decodedText
-          }, "*");
-        }
-
-        alert("✅ Quét thành công!");
-
-        qr.stop();
-
-        // ❗ Khi test thì KHÔNG đóng
-        // Khi tích hợp xong thì mở lại dòng dưới
-        // window.close();
-      },
-      (error) => {
-        // bỏ qua lỗi nhỏ
+      if (!devices || devices.length === 0) {
+        alert("❌ Không tìm thấy camera");
+        return;
       }
-    ).catch(err => {
-      alert("❌ Không mở được camera: " + err);
-    });
+
+      // 👉 CHỌN CAMERA SAU (ổn định nhất)
+      const cameraId = devices[devices.length - 1].id;
+
+      const config = {
+        fps: 10,
+        qrbox: 250
+      };
+
+      await qr.start(
+        cameraId,
+        config,
+        (decodedText) => {
+          console.log("QR:", decodedText);
+
+          // 👉 HIỂN THỊ
+          document.getElementById("result").innerText = decodedText;
+
+          // 👉 GỬI VỀ APPS SCRIPT
+          if (window.opener) {
+            window.opener.postMessage({
+              type: "QR_RESULT",
+              data: decodedText
+            }, "*");
+          }
+
+          alert("✅ Quét thành công!");
+
+          qr.stop();
+
+          // Khi tích hợp thì mở lại
+          // window.close();
+        },
+        () => {}
+      );
+
+    } catch (err) {
+      alert("❌ Lỗi camera: " + err);
+      console.error(err);
+    }
   }
 
   startScan();
