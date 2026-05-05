@@ -89,6 +89,21 @@
       display: none;
       font-size: 14px;
     }
+    .error-msg {
+      position: fixed;
+      bottom: 80px;
+      left: 20px;
+      right: 20px;
+      background: rgba(220,53,69,0.9);
+      color: white;
+      padding: 8px 12px;
+      border-radius: 8px;
+      text-align: center;
+      font-size: 13px;
+      z-index: 20;
+      display: none;
+      backdrop-filter: blur(4px);
+    }
   </style>
   <script src="https://unpkg.com/jsqr@1.4.0/dist/jsQR.js"></script>
 </head>
@@ -104,13 +119,14 @@
   </div>
   <div class="info">✅ Đưa mã QR vào khung xanh · 🔄 Tự động quét</div>
   <div id="loadingMsg" class="loading">⏳ Đang khởi tạo camera...</div>
+  <div id="errorMsg" class="error-msg"></div>
 
   <script>
     const video = document.getElementById('video');
     let scanning = true;
     let animationId = null;
     let lastScanTime = 0;
-    const SCAN_INTERVAL = 120; // ms (~8 lần/giây)
+    const SCAN_INTERVAL = 120; // ms
     let currentStream = null;
     let currentDeviceId = null;
 
@@ -124,10 +140,20 @@
       video.srcObject = null;
     }
 
+    function showError(text) {
+      const errDiv = document.getElementById('errorMsg');
+      errDiv.innerText = text;
+      errDiv.style.display = 'block';
+      setTimeout(() => {
+        errDiv.style.display = 'none';
+      }, 3000);
+    }
+
     async function startCamera(deviceId) {
       await stopCamera();
       scanning = true;
       document.getElementById('loadingMsg').style.display = 'flex';
+      document.getElementById('errorMsg').style.display = 'none';
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
           video: { deviceId: { exact: deviceId }, facingMode: 'environment' }
@@ -139,8 +165,9 @@
         lastScanTime = 0;
         animationId = requestAnimationFrame(scanFrame);
       } catch (err) {
-        document.getElementById('loadingMsg').innerHTML = "❌ Lỗi camera: " + err.message;
-        document.getElementById('loadingMsg').style.display = 'flex';
+        console.error(err);
+        document.getElementById('loadingMsg').style.display = 'none';
+        showError("❌ Lỗi camera: " + err.message);
         scanning = false;
       }
     }
@@ -158,15 +185,18 @@
           const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
           const code = jsQR(imageData.data, canvas.width, canvas.height, { inversionAttempts: 'dontInvert' });
           if (code) {
+            // Quét thành công, gửi dữ liệu về cửa sổ cha và đóng popup ngay lập tức, không có alert
             scanning = false;
             cancelAnimationFrame(animationId);
             stopCamera();
             if (window.opener && !window.opener.closed) {
               window.opener.postMessage({ type: 'qr-scanned', value: code.data }, '*');
-              alert("✅ Quét thành công!");
+              // Đóng popup mà không cần xác nhận
               window.close();
             } else {
-              alert("Lỗi: Không tìm thấy cửa sổ cha.");
+              // Nếu không tìm thấy cửa sổ cha, hiển thị lỗi nhẹ nhàng và cho phép quét lại
+              showError("Không tìm thấy cửa sổ chính. Vui lòng thử lại.");
+              // Khởi động lại camera để quét tiếp
               startCamera(currentDeviceId);
             }
             return;
@@ -180,7 +210,7 @@
       try {
         const devices = await navigator.mediaDevices.enumerateDevices();
         const videoDevices = devices.filter(d => d.kind === 'videoinput');
-        if (!videoDevices.length) throw new Error("Không tìm thấy camera");
+        if (!videoDevices.length) throw new Error("Không tìm thấy camera nào");
         let rearCam = videoDevices.find(d => 
           d.label.toLowerCase().includes('back') ||
           d.label.toLowerCase().includes('rear') ||
@@ -207,7 +237,8 @@
         }
         await startCamera(currentDeviceId);
       } catch (err) {
-        alert("Lỗi: " + err.message);
+        console.error(err);
+        showError("❌ Không thể truy cập camera: " + err.message);
       }
     }
 
