@@ -44,13 +44,16 @@
 <div id="result">👉 Kết quả sẽ hiển thị ở đây</div>
 
 <script>
+  // 🔗 URL của Google Apps Script (thay thế ID_WEBAPP)
+  const GAS_URL = "https://script.google.com/macros/s/AKfycbwQW46V9GOs2VyAqpEo5NZ7RlM_VYgIGM3UmPgf5OMWk6HqQsXswTzQ_mN7sEk5PCd6Sg/exec";
+
   let qr;
 
   async function startScan() {
     qr = new Html5Qrcode("qr-reader");
 
     try {
-      // 🔥 LẤY DANH SÁCH CAMERA
+      // Lấy danh sách camera
       const devices = await Html5Qrcode.getCameras();
 
       if (!devices || devices.length === 0) {
@@ -58,7 +61,7 @@
         return;
       }
 
-      // 👉 CHỌN CAMERA SAU (ổn định nhất)
+      // Chọn camera sau (thường là camera chính diện)
       const cameraId = devices[devices.length - 1].id;
 
       const config = {
@@ -70,27 +73,14 @@
         cameraId,
         config,
         (decodedText) => {
-          console.log("QR:", decodedText);
-
-          // 👉 HIỂN THỊ
+          console.log("QR thành công:", decodedText);
+          // Hiển thị kết quả lên màn hình
           document.getElementById("result").innerText = decodedText;
 
-          // 👉 GỬI VỀ APPS SCRIPT
-          if (window.opener) {
-            window.opener.postMessage({
-              type: "QR_RESULT",
-              data: decodedText
-            }, "*");
-          }
-
-          alert("✅ Quét thành công!");
-
-          qr.stop();
-
-          // Khi tích hợp thì mở lại
-          // window.close();
+          // 🔥 CHUYỂN HƯỚNG SANG APPS SCRIPT VỚI DỮ LIỆU CCCD
+          window.location.href = GAS_URL + "?cccd=" + encodeURIComponent(decodedText);
         },
-        () => {}
+        () => {} // Lỗi quét không cần xử lý
       );
 
     } catch (err) {
