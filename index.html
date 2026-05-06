@@ -4,15 +4,11 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
   <title>Quét QR CCCD - Nhanh & Chính xác</title>
-
-  <!-- ENGINE MẠNH -->
-  <script src="https://unpkg.com/html5-qrcode"></script>
-
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
       background: #000;
-      font-family: 'Segoe UI', system-ui;
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
       height: 100vh;
       display: flex;
       flex-direction: column;
@@ -20,20 +16,24 @@
     }
     .header {
       text-align: center;
-      padding: 12px;
-      background: rgba(0,0,0,0.9);
+      padding: 15px;
+      background: #111;
       color: white;
       font-size: 1.2rem;
       font-weight: bold;
+      z-index: 10;
     }
     .camera-container {
       flex: 1;
       position: relative;
       background: #000;
+      overflow: hidden;
     }
-    #reader {
+    video {
       width: 100%;
       height: 100%;
+      object-fit: cover;
+      display: block;
     }
     .scan-frame {
       position: absolute;
@@ -48,15 +48,17 @@
       border-radius: 20px;
       box-shadow: 0 0 0 100vmax rgba(0,0,0,0.5);
       pointer-events: none;
+      z-index: 10;
     }
     .controls {
-      padding: 12px;
-      background: rgba(0,0,0,0.9);
+      padding: 15px;
+      background: #111;
       display: flex;
       justify-content: center;
-      gap: 12px;
+      gap: 15px;
+      z-index: 10;
     }
-    button, select {
+    button {
       background: #d90429;
       border: none;
       color: white;
@@ -66,13 +68,12 @@
       font-weight: bold;
       cursor: pointer;
     }
-    select { background: #333; }
     .info {
       text-align: center;
       padding: 8px;
       font-size: 12px;
-      background: rgba(0,0,0,0.7);
-      color: #ccc;
+      background: #000000aa;
+      color: #ddd;
     }
     .loading {
       position: fixed;
@@ -84,141 +85,98 @@
       border-radius: 30px;
       color: white;
       z-index: 20;
-      display: none;
+      display: flex;
+      align-items: center;
+      gap: 10px;
     }
+    .spinner {
+      width: 20px;
+      height: 20px;
+      border: 2px solid #fff;
+      border-top: 2px solid transparent;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
   </style>
+  <!-- Sử dụng thư viện qr-scanner mới nhất -->
+  <script type="importmap">
+    {
+      "imports": {
+        "qr-scanner": "https://cdn.jsdelivr.net/npm/qr-scanner@1.4.2/qr-scanner.min.js"
+      }
+    }
+  </script>
 </head>
-
 <body>
+  <div class="header">📷 QUÉT MÃ QR CCCD</div>
+  <div class="camera-container">
+    <video id="video" playsinline muted></video>
+    <div class="scan-frame"></div>
+  </div>
+  <div class="controls">
+    <button id="closeBtn">Đóng</button>
+  </div>
+  <div class="info">✅ Đưa mã QR vào khung xanh · 🔄 Tự động quét, nhanh và chính xác hơn</div>
+  <div id="loadingMsg" class="loading">
+    <div class="spinner"></div> Đang khởi tạo camera...
+  </div>
 
-<div class="header">📷 QUÉT MÃ QR CCCD</div>
-
-<div class="camera-container">
-  <div id="reader"></div>
-  <div class="scan-frame"></div>
-</div>
-
-<div class="controls">
-  <select id="cameraSelect" style="display:none;"></select>
-  <button onclick="closeScan()">Đóng</button>
-</div>
-
-<div class="info">
-  ✅ Đưa mã QR vào khung xanh · 🔄 Tự động quét
-</div>
-
-<div id="loadingMsg" class="loading">⏳ Đang khởi tạo camera...</div>
-
-<script>
-let html5QrCode;
-let currentCameraId = null;
-
-// ================== START CAMERA ==================
-async function startScanner(cameraId) {
-  document.getElementById('loadingMsg').style.display = 'block';
-
-  if (html5QrCode) {
-    try { await html5QrCode.stop(); } catch(e) {}
-  }
-
-  html5QrCode = new Html5Qrcode("reader");
-
-  const config = {
-    fps: 15,
-    qrbox: { width: 250, height: 250 },
-    aspectRatio: 1.0,
-    experimentalFeatures: {
-      useBarCodeDetectorIfSupported: true
+  <script type="module">
+    import QrScanner from 'qr-scanner';
+    
+    let scanner = null;
+    const videoElement = document.getElementById('video');
+    const loadingDiv = document.getElementById('loadingMsg');
+    
+    async function startScanner() {
+      try {
+        // Khởi tạo scanner với video element
+        scanner = new QrScanner(
+          videoElement,
+          result => {
+            // ----- QUÉT THÀNH CÔNG! -----
+            // Gửi dữ liệu về cửa sổ chính
+            if (window.opener && !window.opener.closed) {
+              window.opener.postMessage({ type: 'qr-scanned', value: result.data }, '*');
+            }
+            // Đóng popup ngay lập tức, không cần thông báo gì thêm
+            window.close();
+          },
+          {
+            onDecodeError: (error) => {
+              // Bạn có thể log lỗi ra console để debug nếu cần
+              // console.debug('QR decode error:', error);
+            },
+            highlightScanRegion: true, // Làm nổi bật vùng quét
+            highlightCodeOutline: true, // Viền khi tìm thấy QR
+            preferredCamera: 'environment', // Ưu tiên camera sau
+            maxScansPerSecond: 10, // Quét 10 khung hình/giây, cân bằng hiệu năng
+          }
+        );
+        
+        // Bắt đầu quét
+        await scanner.start();
+        loadingDiv.style.display = 'none';
+      } catch (err) {
+        loadingDiv.innerHTML = '❌ Lỗi: Không thể truy cập camera hoặc thiết bị không hỗ trợ.';
+        console.error('Lỗi khởi tạo scanner:', err);
+      }
     }
-  };
-
-  try {
-    await html5QrCode.start(
-      cameraId,
-      config,
-      onScanSuccess
-    );
-
-    document.getElementById('loadingMsg').style.display = 'none';
-  } catch (err) {
-    console.error(err);
-    alert("❌ Không mở được camera");
-  }
-}
-
-// ================== INIT CAMERA ==================
-async function initCamera() {
-  try {
-    const devices = await Html5Qrcode.getCameras();
-
-    if (!devices.length) {
-      alert("Không tìm thấy camera");
-      return;
-    }
-
-    let rearCam = devices.find(d =>
-      d.label.toLowerCase().includes('back') ||
-      d.label.toLowerCase().includes('rear')
-    );
-
-    if (!rearCam) rearCam = devices[devices.length - 1];
-
-    currentCameraId = rearCam.id;
-
-    // dropdown camera
-    if (devices.length > 1) {
-      const select = document.getElementById('cameraSelect');
-      select.style.display = 'inline-block';
-
-      devices.forEach(dev => {
-        const opt = document.createElement('option');
-        opt.value = dev.id;
-        opt.text = dev.label || "Camera";
-        if (dev.id === currentCameraId) opt.selected = true;
-        select.appendChild(opt);
-      });
-
-      select.onchange = () => startScanner(select.value);
-    }
-
-    await startScanner(currentCameraId);
-
-  } catch (err) {
-    console.error(err);
-    alert("Không truy cập được camera");
-  }
-}
-
-// ================== SUCCESS ==================
-function onScanSuccess(decodedText) {
-  if (html5QrCode) {
-    html5QrCode.stop().catch(e => console.log(e));
-  }
-
-  try {
-    if (window.opener) {
-      window.opener.postMessage(decodedText, "*");
-    } else {
-      localStorage.setItem("QR_RESULT", decodedText);
-    }
-  } catch (e) {
-    console.error(e);
-  }
-
-  setTimeout(() => window.close(), 300);
-}
-
-// ================== CLOSE ==================
-function closeScan() {
-  if (html5QrCode) {
-    html5QrCode.stop().catch(e => console.log(e));
-  }
-  window.close();
-}
-
-// ================== START ==================
-window.onload = initCamera;
-</script>
-
+    
+    // Đóng popup khi bấm nút
+    document.getElementById('closeBtn').onclick = () => window.close();
+    
+    // Khởi chạy ngay khi trang tải xong
+    startScanner();
+    
+    // Dọn dẹp một chút nếu popup bị đóng đột ngột
+    window.addEventListener('beforeunload', () => {
+      if (scanner) {
+        scanner.stop();
+        scanner.destroy();
+      }
+    });
+  </script>
 </body>
 </html>
