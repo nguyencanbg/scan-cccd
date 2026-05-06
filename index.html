@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
-  <title>Quét QR CCCD - Nhanh & Chính xác</title>
+  <title>Quét QR CCCD - Chính xác cao</title>
   <style>
     * {
       margin: 0;
@@ -46,7 +46,6 @@
       display: block;
     }
 
-    /* Lớp phủ khung quét đẹp mắt */
     .overlay {
       position: absolute;
       top: 0;
@@ -214,21 +213,28 @@
     <div class="spinner"></div> Đang xử lý...
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
   <script>
     (function() {
       let scanning = true;
       let videoElement = document.getElementById('video');
       let statusBadge = document.getElementById('statusBadge');
       let currentStream = null;
+      let animationId = null;
+      let lastScanTime = 0;
+      const SCAN_INTERVAL = 120; // ms
 
-      // Hàm hiển thị trạng thái
       function setStatus(text, isError = false) {
         statusBadge.innerHTML = text;
         statusBadge.style.color = isError ? '#ff8888' : '#aaffaa';
       }
 
-      // Dừng camera
       async function stopCamera() {
+        scanning = false;
+        if (animationId) {
+          cancelAnimationFrame(animationId);
+          animationId = null;
+        }
         if (currentStream) {
           currentStream.getTracks().forEach(track => track.stop());
           currentStream = null;
@@ -236,29 +242,18 @@
         videoElement.srcObject = null;
       }
 
-      // Gửi kết quả và đóng popup
       function onCodeFound(code) {
         if (!scanning) return;
         scanning = false;
-        
-        // Dừng camera ngay
-        stopCamera();
-        
-        // Gửi về cửa sổ cha
-        if (window.opener && !window.opener.closed) {
-          window.opener.postMessage({ type: 'qr-scanned', value: code }, '*');
-        }
-        // Đóng popup không cần confirm
-        window.close();
+        stopCamera().then(() => {
+          if (window.opener && !window.opener.closed) {
+            window.opener.postMessage({ type: 'qr-scanned', value: code }, '*');
+          }
+          window.close();
+        }).catch(() => window.close());
       }
 
-      // ========== PHƯƠNG PHÁP 1: Native BarcodeDetector (nhanh nhất) ==========
-      async function startNativeScanner() {
-        if (!('BarcodeDetector' in window)) {
-          console.log("Native BarcodeDetector không hỗ trợ, fallback sang phương pháp khác");
-          return false;
-        }
-        
+      async function startScanner() {
         try {
           const stream = await navigator.mediaDevices.getUserMedia({
             video: { facingMode: 'environment' }
@@ -266,83 +261,19 @@
           currentStream = stream;
           videoElement.srcObject = stream;
           await videoElement.play();
-          setStatus("📷 Native scanner đã sẵn sàng");
+          setStatus("✅ Camera sẵn sàng - Đang quét...");
           
-          const detector = new BarcodeDetector({ formats: ['qr_code'] });
-          let lastTime = 0;
-          const interval = 150; // ms giữa các lần quét
-            
-          const scan = async () => {
-            if (!scanning) return;
-            requestAnimationFrame(async () => {
-              if (!scanning) return;
-              const now = Date.now();
-              if (now - lastTime < interval) {
-                requestAnimationFrame(scan);
-                return;
-              }
-              lastTime = now;
-              if (videoElement.readyState === 4 && videoElement.videoWidth > 0) {
-                try {
-                  const barcodes = await detector.detect(videoElement);
-                  if (barcodes.length > 0 && scanning) {
-                    const code = barcodes[0].rawValue;
-                    onCodeFound(code);
-                    return;
-                  }
-                } catch (err) {
-                  // lỗi nhẹ, bỏ qua
-                }
-              }
-              requestAnimationFrame(scan);
-            });
-          };
-          requestAnimationFrame(scan);
-          return true;
-        } catch (err) {
-          console.error("Lỗi native scanner:", err);
-          setStatus("⚠️ Lỗi camera native, chuyển sang chế độ dự phòng", true);
-          return false;
-        }
-      }
-
-      // ========== PHƯƠNG PHÁP 2: Dự phòng dùng canvas + jsQR (nhẹ, kiểm soát giao diện) ==========
-      async function startFallbackScanner() {
-        try {
-          const stream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: 'environment' }
-          });
-          currentStream = stream;
-          videoElement.srcObject = stream;
-          await videoElement.play();
-          setStatus("🔄 Chế độ dự phòng (cnv+jsQR)");
-          
-          // Tải jsQR từ CDN (nhẹ hơn html5-qrcode)
-          await new Promise((resolve, reject) => {
-            const script = document.createElement('script');
-            script.src = 'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js';
-            script.onload = resolve;
-            script.onerror = reject;
-            document.head.appendChild(script);
-          });
-          
-          let lastTime = 0;
-          const interval = 120;
-          
+          // Tạo canvas để lấy frame
           const canvas = document.createElement('canvas');
           const ctx = canvas.getContext('2d');
           
-          const scanFrame = async () => {
+          function scanFrame() {
             if (!scanning) return;
-            requestAnimationFrame(async () => {
-              if (!scanning) return;
-              const now = Date.now();
-              if (now - lastTime < interval) {
-                requestAnimationFrame(scanFrame);
-                return;
-              }
-              lastTime = now;
-              if (videoElement.readyState === 4 && videoElement.videoWidth > 0) {
+            
+            const now = Date.now();
+            if (now - lastScanTime >= SCAN_INTERVAL) {
+              lastScanTime = now;
+              if (videoElement.readyState === videoElement.HAVE_ENOUGH_DATA && videoElement.videoWidth && videoElement.videoHeight) {
                 canvas.width = videoElement.videoWidth;
                 canvas.height = videoElement.videoHeight;
                 ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
@@ -355,43 +286,31 @@
                   return;
                 }
               }
-              requestAnimationFrame(scanFrame);
-            });
-          };
-          requestAnimationFrame(scanFrame);
-          return true;
+            }
+            animationId = requestAnimationFrame(scanFrame);
+          }
+          
+          scanFrame();
         } catch (err) {
-          console.error("Fallback scanner lỗi:", err);
-          setStatus("❌ Không thể truy cập camera", true);
-          return false;
+          console.error("Lỗi camera:", err);
+          setStatus("❌ Không thể truy cập camera. Kiểm tra quyền.", true);
+          const loadingDiv = document.getElementById('loadingMsg');
+          loadingDiv.innerHTML = '❌ Lỗi: Không thể khởi tạo camera';
+          loadingDiv.style.display = 'flex';
         }
       }
 
-      // Khởi động
-      (async () => {
-        const loading = document.getElementById('loadingMsg');
-        loading.style.display = 'flex';
-        
-        let success = await startNativeScanner();
-        if (!success) {
-          success = await startFallbackScanner();
-        }
-        
-        if (!success) {
-          statusBadge.innerHTML = "❌ Không có camera hoặc bị từ chối quyền";
-          loading.innerHTML = '❌ Lỗi: Không thể khởi tạo camera';
-          loading.style.display = 'flex';
-        } else {
-          loading.style.display = 'none';
-        }
-      })();
+      // Bắt đầu
+      const loadingDiv = document.getElementById('loadingMsg');
+      loadingDiv.style.display = 'flex';
+      startScanner().then(() => {
+        loadingDiv.style.display = 'none';
+      }).catch(() => {
+        loadingDiv.style.display = 'none';
+      });
 
       document.getElementById('closeBtn').onclick = () => window.close();
-      
-      // Cleanup khi đóng trang
-      window.addEventListener('beforeunload', () => {
-        stopCamera();
-      });
+      window.addEventListener('beforeunload', () => stopCamera());
     })();
   </script>
 </body>
