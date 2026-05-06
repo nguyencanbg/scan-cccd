@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
-  <title>Quét QR CCCD - Chính xác cao</title>
+  <title>Quét QR CCCD - Nhận diện QR nhỏ</title>
   <style>
     * {
       margin: 0;
@@ -56,6 +56,7 @@
       pointer-events: none;
     }
 
+    /* Khung quét vẫn giữ nguyên để hướng dẫn, nhưng thực tế vùng quét được zoom ở trung tâm */
     .scan-frame {
       position: absolute;
       top: 50%;
@@ -193,6 +194,7 @@
 
     @keyframes spin { to { transform: rotate(360deg); } }
   </style>
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 </head>
 <body>
   <div class="header">📷 QUÉT MÃ QR CCCD</div>
@@ -208,21 +210,24 @@
   <div class="controls">
     <button id="closeBtn">Đóng</button>
   </div>
-  <div class="info">✅ Đưa mã QR vào khung xanh · Tự động quét nhanh</div>
+  <div class="info">✅ Đưa mã QR vào giữa khung, tự động phóng đại để quét QR nhỏ nhất</div>
   <div id="loadingMsg" class="loading" style="display: none;">
     <div class="spinner"></div> Đang xử lý...
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
   <script>
     (function() {
       let scanning = true;
-      let videoElement = document.getElementById('video');
-      let statusBadge = document.getElementById('statusBadge');
+      const video = document.getElementById('video');
+      const statusBadge = document.getElementById('statusBadge');
       let currentStream = null;
       let animationId = null;
       let lastScanTime = 0;
-      const SCAN_INTERVAL = 120; // ms
+      const SCAN_INTERVAL = 100; // quét nhanh hơn
+
+      // Cấu hình zoom: lấy vùng trung tâm với tỉ lệ bao nhiêu % của khung hình
+      const ZOOM_RATIO = 1.8;   // phóng to 1.8 lần (có thể điều chỉnh)
+      // Thực tế: crop 1/ZOOM_RATIO vùng trung tâm rồi phóng lên kích thước gốc
 
       function setStatus(text, isError = false) {
         statusBadge.innerHTML = text;
@@ -239,7 +244,7 @@
           currentStream.getTracks().forEach(track => track.stop());
           currentStream = null;
         }
-        videoElement.srcObject = null;
+        video.srcObject = null;
       }
 
       function onCodeFound(code) {
@@ -255,15 +260,20 @@
 
       async function startScanner() {
         try {
+          // Yêu cầu độ phân giải cao để lấy nhiều chi tiết
           const stream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: 'environment' }
+            video: {
+              facingMode: 'environment',
+              width: { ideal: 1920 },
+              height: { ideal: 1080 }
+            }
           });
           currentStream = stream;
-          videoElement.srcObject = stream;
-          await videoElement.play();
-          setStatus("✅ Camera sẵn sàng - Đang quét...");
-          
-          // Tạo canvas để lấy frame
+          video.srcObject = stream;
+          await video.play();
+          setStatus("✅ Camera sẵn sàng - Zoom số tự động");
+
+          // Canvas dùng để quét (sẽ được phóng to)
           const canvas = document.createElement('canvas');
           const ctx = canvas.getContext('2d');
           
@@ -273,14 +283,28 @@
             const now = Date.now();
             if (now - lastScanTime >= SCAN_INTERVAL) {
               lastScanTime = now;
-              if (videoElement.readyState === videoElement.HAVE_ENOUGH_DATA && videoElement.videoWidth && videoElement.videoHeight) {
-                canvas.width = videoElement.videoWidth;
-                canvas.height = videoElement.videoHeight;
-                ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
-                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                const code = jsQR(imageData.data, canvas.width, canvas.height, {
+              
+              if (video.readyState === video.HAVE_ENOUGH_DATA && video.videoWidth && video.videoHeight) {
+                const vw = video.videoWidth;
+                const vh = video.videoHeight;
+                
+                // Tính toán vùng crop trung tâm theo tỉ lệ zoom
+                const cropWidth = vw / ZOOM_RATIO;
+                const cropHeight = vh / ZOOM_RATIO;
+                const startX = (vw - cropWidth) / 2;
+                const startY = (vh - cropHeight) / 2;
+                
+                // Canvas tạm để vẽ vùng crop và phóng to
+                canvas.width = vw;        // phóng to bằng kích thước video gốc
+                canvas.height = vh;
+                ctx.drawImage(video, startX, startY, cropWidth, cropHeight, 0, 0, vw, vh);
+                
+                // Lấy dữ liệu ảnh từ canvas đã phóng to
+                const imageData = ctx.getImageData(0, 0, vw, vh);
+                const code = jsQR(imageData.data, vw, vh, {
                   inversionAttempts: 'dontInvert',
                 });
+                
                 if (code && scanning) {
                   onCodeFound(code.data);
                   return;
@@ -292,7 +316,7 @@
           
           scanFrame();
         } catch (err) {
-          console.error("Lỗi camera:", err);
+          console.error(err);
           setStatus("❌ Không thể truy cập camera. Kiểm tra quyền.", true);
           const loadingDiv = document.getElementById('loadingMsg');
           loadingDiv.innerHTML = '❌ Lỗi: Không thể khởi tạo camera';
@@ -300,12 +324,9 @@
         }
       }
 
-      // Bắt đầu
       const loadingDiv = document.getElementById('loadingMsg');
       loadingDiv.style.display = 'flex';
-      startScanner().then(() => {
-        loadingDiv.style.display = 'none';
-      }).catch(() => {
+      startScanner().finally(() => {
         loadingDiv.style.display = 'none';
       });
 
