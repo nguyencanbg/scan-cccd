@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
-  <title>Quét QR CCCD - Nhận diện QR nhỏ</title>
+  <title>Quét QR CCCD - Siêu tốc</title>
   <style>
     * {
       margin: 0;
@@ -56,7 +56,7 @@
       pointer-events: none;
     }
 
-    /* Khung quét vẫn giữ nguyên để hướng dẫn, nhưng thực tế vùng quét được zoom ở trung tâm */
+    /* Khung quét được tối ưu cho QR nhỏ */
     .scan-frame {
       position: absolute;
       top: 50%;
@@ -194,145 +194,111 @@
 
     @keyframes spin { to { transform: rotate(360deg); } }
   </style>
-  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+  <!-- Chỉ cần import qr-scanner (CDN chính thức) -->
+  <script type="importmap">
+    {
+      "imports": {
+        "qr-scanner": "https://cdn.jsdelivr.net/npm/qr-scanner@1.4.2/qr-scanner.min.js"
+      }
+    }
+  </script>
 </head>
 <body>
-  <div class="header">📷 QUÉT MÃ QR CCCD</div>
+  <div class="header">📷 QUÉT MÃ QR CCCD - TỐC ĐỘ CAO</div>
   <div class="camera-container">
-    <video id="video" autoplay playsinline muted></video>
+    <video id="video" playsinline muted></video>
     <div class="overlay">
       <div class="scan-frame">
         <div class="scan-line"></div>
       </div>
     </div>
-    <div class="status-badge" id="statusBadge">⚙️ Đang khởi tạo...</div>
+    <div class="status-badge" id="statusBadge">⚙️ Đang khởi tạo công cụ quét...</div>
   </div>
   <div class="controls">
     <button id="closeBtn">Đóng</button>
   </div>
-  <div class="info">✅ Đưa mã QR vào giữa khung, tự động phóng đại để quét QR nhỏ nhất</div>
+  <div class="info">✅ Đưa mã QR vào khung xanh · Quét siêu tốc, nhận diện QR nhỏ tốt nhất</div>
   <div id="loadingMsg" class="loading" style="display: none;">
     <div class="spinner"></div> Đang xử lý...
   </div>
 
-  <script>
-    (function() {
-      let scanning = true;
-      const video = document.getElementById('video');
-      const statusBadge = document.getElementById('statusBadge');
-      let currentStream = null;
-      let animationId = null;
-      let lastScanTime = 0;
-      const SCAN_INTERVAL = 100; // quét nhanh hơn
-
-      // Cấu hình zoom: lấy vùng trung tâm với tỉ lệ bao nhiêu % của khung hình
-      const ZOOM_RATIO = 2.2;   // phóng to 1.8 lần (có thể điều chỉnh)
-      // Thực tế: crop 1/ZOOM_RATIO vùng trung tâm rồi phóng lên kích thước gốc
-
-      function setStatus(text, isError = false) {
-        statusBadge.innerHTML = text;
-        statusBadge.style.color = isError ? '#ff8888' : '#aaffaa';
+  <script type="module">
+    import QrScanner from 'qr-scanner';
+    
+    let scanner = null;
+    const video = document.getElementById('video');
+    const statusBadge = document.getElementById('statusBadge');
+    const loadingDiv = document.getElementById('loadingMsg');
+    
+    function setStatus(text, isError = false) {
+      statusBadge.innerHTML = text;
+      statusBadge.style.color = isError ? '#ff8888' : '#aaffaa';
+    }
+    
+    function onCodeFound(result) {
+      if (!scanner) return;
+      
+      // Dừng scanner ngay lập tức để tránh quét nhiều lần
+      scanner.stop();
+      
+      // Gửi dữ liệu về cửa sổ chính
+      if (window.opener && !window.opener.closed) {
+        window.opener.postMessage({ type: 'qr-scanned', value: result }, '*');
       }
-
-      async function stopCamera() {
-        scanning = false;
-        if (animationId) {
-          cancelAnimationFrame(animationId);
-          animationId = null;
-        }
-        if (currentStream) {
-          currentStream.getTracks().forEach(track => track.stop());
-          currentStream = null;
-        }
-        video.srcObject = null;
-      }
-
-      function onCodeFound(code) {
-        if (!scanning) return;
-        scanning = false;
-        stopCamera().then(() => {
-          if (window.opener && !window.opener.closed) {
-            window.opener.postMessage({ type: 'qr-scanned', value: code }, '*');
-          }
-          window.close();
-        }).catch(() => window.close());
-      }
-
-      async function startScanner() {
-        try {
-          // Yêu cầu độ phân giải cao để lấy nhiều chi tiết
-          const stream = await navigator.mediaDevices.getUserMedia({
-            video: {
-              facingMode: 'environment',
-              width: { ideal: 1920 },
-              height: { ideal: 1080 }
-            }
-          });
-          currentStream = stream;
-          video.srcObject = stream;
-          await video.play();
-          setStatus("✅ Camera sẵn sàng - Zoom số tự động");
-
-          // Canvas dùng để quét (sẽ được phóng to)
-          const canvas = document.createElement('canvas');
-          const ctx = canvas.getContext('2d');
-          
-          function scanFrame() {
-            if (!scanning) return;
-            
-            const now = Date.now();
-            if (now - lastScanTime >= SCAN_INTERVAL) {
-              lastScanTime = now;
-              
-              if (video.readyState === video.HAVE_ENOUGH_DATA && video.videoWidth && video.videoHeight) {
-                const vw = video.videoWidth;
-                const vh = video.videoHeight;
-                
-                // Tính toán vùng crop trung tâm theo tỉ lệ zoom
-                const cropWidth = vw / ZOOM_RATIO;
-                const cropHeight = vh / ZOOM_RATIO;
-                const startX = (vw - cropWidth) / 2;
-                const startY = (vh - cropHeight) / 2;
-                
-                // Canvas tạm để vẽ vùng crop và phóng to
-                canvas.width = vw;        // phóng to bằng kích thước video gốc
-                canvas.height = vh;
-                ctx.drawImage(video, startX, startY, cropWidth, cropHeight, 0, 0, vw, vh);
-                
-                // Lấy dữ liệu ảnh từ canvas đã phóng to
-                const imageData = ctx.getImageData(0, 0, vw, vh);
-                const code = jsQR(imageData.data, vw, vh, {
-                  inversionAttempts: 'dontInvert',
-                });
-                
-                if (code && scanning) {
-                  onCodeFound(code.data);
-                  return;
-                }
-              }
-            }
-            animationId = requestAnimationFrame(scanFrame);
-          }
-          
-          scanFrame();
-        } catch (err) {
-          console.error(err);
-          setStatus("❌ Không thể truy cập camera. Kiểm tra quyền.", true);
-          const loadingDiv = document.getElementById('loadingMsg');
-          loadingDiv.innerHTML = '❌ Lỗi: Không thể khởi tạo camera';
-          loadingDiv.style.display = 'flex';
-        }
-      }
-
-      const loadingDiv = document.getElementById('loadingMsg');
+      // Tự động đóng popup
+      window.close();
+    }
+    
+    async function startScanner() {
       loadingDiv.style.display = 'flex';
-      startScanner().finally(() => {
+      try {
+        // Tạo scanner mới
+        scanner = new QrScanner(
+          video,
+          result => onCodeFound(result.data),
+          {
+            onDecodeError: (error) => {
+              // Lỗi giải mã thường gặp khi QR chưa vào đúng khung, bỏ qua
+              // console.debug(error);
+            },
+            highlightScanRegion: true,
+            highlightCodeOutline: true,
+            maxScansPerSecond: 15, // Tăng tốc quét lên 15 lần/giây
+            preferredCamera: 'environment' // Luôn ưu tiên camera sau
+          }
+        );
+        
+        // HIỂN THỊ THÔNG BÁO: KIỂM TRA KHẢ NĂNG TỐI ƯU
+        if (QrScanner.hasNativeScanner()) {
+          setStatus('✅ Camera sẵn sàng (Chế độ Native Turbo)');
+        } else {
+          setStatus('✅ Camera sẵn sàng (Chế độ ZXing siêu tốc)');
+        }
+        
+        // Bắt đầu quét
+        await scanner.start();
         loadingDiv.style.display = 'none';
-      });
-
-      document.getElementById('closeBtn').onclick = () => window.close();
-      window.addEventListener('beforeunload', () => stopCamera());
-    })();
+      } catch (err) {
+        console.error(err);
+        setStatus('❌ Lỗi: Không thể truy cập camera. Vui lòng kiểm tra quyền.', true);
+        loadingDiv.innerHTML = '❌ Lỗi: Không thể khởi tạo camera';
+        loadingDiv.style.display = 'flex';
+      }
+    }
+    
+    // Bắt đầu quét
+    startScanner();
+    
+    // Đóng popup khi bấm nút Đóng
+    document.getElementById('closeBtn').onclick = () => window.close();
+    
+    // Dọn dẹp khi thoát
+    window.addEventListener('beforeunload', () => {
+      if (scanner) {
+        scanner.stop();
+        scanner.destroy();
+      }
+    });
   </script>
 </body>
 </html>
