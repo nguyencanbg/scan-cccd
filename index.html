@@ -13,7 +13,7 @@
 
     body {
       background: #000;
-      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      font-family: system-ui, 'Segoe UI', -apple-system, sans-serif;
       height: 100vh;
       display: flex;
       flex-direction: column;
@@ -23,32 +23,38 @@
     .header {
       text-align: center;
       padding: 15px;
-      background: #111;
+      background: rgba(0,0,0,0.8);
+      backdrop-filter: blur(10px);
       color: white;
       font-size: 1.2rem;
-      font-weight: bold;
+      font-weight: 600;
       z-index: 10;
+      border-bottom: 1px solid rgba(255,255,255,0.2);
     }
 
     .camera-container {
       flex: 1;
       position: relative;
       background: #000;
-      display: flex;
-      justify-content: center;
-      align-items: center;
+      overflow: hidden;
     }
 
-    #qr-reader {
+    video {
       width: 100%;
       height: 100%;
-      background: #000;
+      object-fit: cover;
+      display: block;
     }
 
-    /* Tuỳ chỉnh lại khung quét của html5-qrcode */
-    #qr-reader__scan_region {
-      border: none !important;
-      background: transparent !important;
+    /* Lớp phủ khung quét đẹp mắt */
+    .overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 20;
+      pointer-events: none;
     }
 
     .scan-frame {
@@ -56,36 +62,80 @@
       top: 50%;
       left: 50%;
       transform: translate(-50%, -50%);
-      width: 70%;
-      max-width: 280px;
-      height: 70%;
-      max-height: 280px;
-      border: 2px solid #4caf50;
-      border-radius: 20px;
-      box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.5);
-      pointer-events: none;
-      z-index: 20;
+      width: 280px;
+      height: 280px;
+      border-radius: 24px;
+      background: transparent;
+      box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.6);
+      border: 2px solid rgba(76, 175, 80, 0.9);
+    }
+
+    .scan-frame::before,
+    .scan-frame::after {
+      content: '';
+      position: absolute;
+      width: 40px;
+      height: 40px;
+      border-color: #4caf50;
+      border-style: solid;
+      border-width: 0;
+    }
+
+    .scan-frame::before {
+      top: -2px;
+      left: -2px;
+      border-top-width: 4px;
+      border-left-width: 4px;
+      border-radius: 8px 0 0 0;
+    }
+
+    .scan-frame::after {
+      bottom: -2px;
+      right: -2px;
+      border-bottom-width: 4px;
+      border-right-width: 4px;
+      border-radius: 0 0 8px 0;
+    }
+
+    .scan-line {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 3px;
+      background: linear-gradient(90deg, transparent, #4caf50, #4caf50, transparent);
+      animation: scan 2s linear infinite;
+      box-shadow: 0 0 6px #4caf50;
+    }
+
+    @keyframes scan {
+      0% { top: 0; }
+      50% { top: 100%; }
+      100% { top: 0; }
     }
 
     .controls {
       padding: 15px;
-      background: #111;
+      background: rgba(0,0,0,0.8);
+      backdrop-filter: blur(10px);
       display: flex;
       justify-content: center;
       gap: 15px;
       z-index: 10;
+      border-top: 1px solid rgba(255,255,255,0.2);
     }
 
     button {
       background: #d90429;
       border: none;
       color: white;
-      padding: 8px 20px;
-      border-radius: 30px;
-      font-size: 14px;
+      padding: 10px 28px;
+      border-radius: 40px;
+      font-size: 16px;
       font-weight: bold;
       cursor: pointer;
       transition: 0.2s;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
     }
 
     button:active {
@@ -95,9 +145,24 @@
     .info {
       text-align: center;
       padding: 8px;
+      font-size: 13px;
+      background: rgba(0,0,0,0.6);
+      color: #ccc;
+      backdrop-filter: blur(4px);
+    }
+
+    .status-badge {
+      position: absolute;
+      bottom: 20px;
+      left: 20px;
+      background: rgba(0,0,0,0.7);
+      padding: 6px 12px;
+      border-radius: 20px;
       font-size: 12px;
-      background: #000000aa;
-      color: #ddd;
+      color: #ffaa44;
+      z-index: 25;
+      font-family: monospace;
+      pointer-events: none;
     }
 
     .loading {
@@ -105,9 +170,9 @@
       top: 50%;
       left: 50%;
       transform: translate(-50%, -50%);
-      background: rgba(0, 0, 0, 0.85);
-      backdrop-filter: blur(4px);
-      padding: 12px 20px;
+      background: rgba(0,0,0,0.85);
+      backdrop-filter: blur(8px);
+      padding: 16px 24px;
       border-radius: 40px;
       color: white;
       z-index: 30;
@@ -115,140 +180,219 @@
       align-items: center;
       gap: 12px;
       font-size: 14px;
-      pointer-events: none;
+      border: 1px solid rgba(255,255,255,0.2);
     }
 
     .spinner {
-      width: 18px;
-      height: 18px;
+      width: 20px;
+      height: 20px;
       border: 2px solid #fff;
-      border-top: 2px solid transparent;
+      border-top: 2px solid #4caf50;
       border-radius: 50%;
       animation: spin 0.8s linear infinite;
     }
 
-    @keyframes spin {
-      to {
-        transform: rotate(360deg);
-      }
-    }
-
-    /* Ẩn các thành phần không mong muốn từ thư viện */
-    #qr-reader__dashboard,
-    #qr-reader__status_span {
-      display: none !important;
-    }
-
-    #qr-reader__video {
-      object-fit: cover !important;
-      width: 100% !important;
-      height: 100% !important;
-    }
+    @keyframes spin { to { transform: rotate(360deg); } }
   </style>
-  <!-- Thư viện html5-qrcode phiên bản mới nhất (ổn định) -->
-  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 </head>
 <body>
   <div class="header">📷 QUÉT MÃ QR CCCD</div>
   <div class="camera-container">
-    <div id="qr-reader"></div>
-    <div class="scan-frame"></div>
+    <video id="video" autoplay playsinline muted></video>
+    <div class="overlay">
+      <div class="scan-frame">
+        <div class="scan-line"></div>
+      </div>
+    </div>
+    <div class="status-badge" id="statusBadge">⚙️ Đang khởi tạo...</div>
   </div>
   <div class="controls">
     <button id="closeBtn">Đóng</button>
   </div>
-  <div class="info">✅ Đưa mã QR vào khung xanh · 🔄 Tự động quét · Nhanh và chính xác</div>
-  <div id="loadingMsg" class="loading">
-    <div class="spinner"></div> Đang khởi tạo camera...
+  <div class="info">✅ Đưa mã QR vào khung xanh · Tự động quét nhanh</div>
+  <div id="loadingMsg" class="loading" style="display: none;">
+    <div class="spinner"></div> Đang xử lý...
   </div>
 
   <script>
-    let html5QrCode = null;
-    let isScanning = true;
-    const loadingDiv = document.getElementById('loadingMsg');
+    (function() {
+      let scanning = true;
+      let videoElement = document.getElementById('video');
+      let statusBadge = document.getElementById('statusBadge');
+      let currentStream = null;
 
-    // Hàm gửi kết quả về window.opener và đóng popup
-    function onScanSuccess(decodedText, decodedResult) {
-      if (!isScanning) return; // tránh gửi nhiều lần
-
-      isScanning = false;
-      
-      // Dừng luồng quét để giải phóng tài nguyên
-      if (html5QrCode) {
-        html5QrCode.stop().then(() => {
-          console.log("QR Scanner stopped.");
-        }).catch(err => console.warn("Lỗi khi dừng scanner:", err));
+      // Hàm hiển thị trạng thái
+      function setStatus(text, isError = false) {
+        statusBadge.innerHTML = text;
+        statusBadge.style.color = isError ? '#ff8888' : '#aaffaa';
       }
 
-      // Gửi dữ liệu về cửa sổ cha (ứng dụng chính)
-      if (window.opener && !window.opener.closed) {
-        window.opener.postMessage({ type: 'qr-scanned', value: decodedText }, '*');
-      } else {
-        // Nếu không tìm thấy cửa sổ cha, vẫn đóng nhưng có thể log lỗi (không ảnh hưởng)
-        console.warn("Không tìm thấy cửa sổ cha để gửi kết quả.");
+      // Dừng camera
+      async function stopCamera() {
+        if (currentStream) {
+          currentStream.getTracks().forEach(track => track.stop());
+          currentStream = null;
+        }
+        videoElement.srcObject = null;
       }
 
-      // Đóng popup ngay lập tức, không cần xác nhận
-      window.close();
-    }
-
-    function onScanError(errorMessage) {
-      // Không làm gì với lỗi quét, chỉ log ra console nếu cần debug
-      // console.debug("QR scan error:", errorMessage);
-    }
-
-    async function startScanner() {
-      loadingDiv.style.display = 'flex';
-      try {
-        html5QrCode = new Html5Qrcode("qr-reader");
+      // Gửi kết quả và đóng popup
+      function onCodeFound(code) {
+        if (!scanning) return;
+        scanning = false;
         
-        // Cấu hình camera: ưu tiên camera sau, độ phân giải vừa phải để tăng tốc
-        const config = {
-          fps: 15,                 // khung hình/giây - đủ nhanh, không quá tải
-          qrbox: { width: 280, height: 280 }, // khung quét kích thước vừa
-          aspectRatio: 1.0,
-          disableFlip: false,
-          facingMode: "environment" // camera sau
-        };
+        // Dừng camera ngay
+        stopCamera();
         
-        await html5QrCode.start(
-          { facingMode: "environment" }, // dùng camera sau
-          config,
-          onScanSuccess,
-          onScanError
-        );
-        loadingDiv.style.display = 'none';
-      } catch (err) {
-        console.error("Lỗi khởi tạo scanner:", err);
-        loadingDiv.innerHTML = '❌ Không thể truy cập camera hoặc thiết bị không hỗ trợ.';
-        // Thử fallback: camera mặc định
+        // Gửi về cửa sổ cha
+        if (window.opener && !window.opener.closed) {
+          window.opener.postMessage({ type: 'qr-scanned', value: code }, '*');
+        }
+        // Đóng popup không cần confirm
+        window.close();
+      }
+
+      // ========== PHƯƠNG PHÁP 1: Native BarcodeDetector (nhanh nhất) ==========
+      async function startNativeScanner() {
+        if (!('BarcodeDetector' in window)) {
+          console.log("Native BarcodeDetector không hỗ trợ, fallback sang phương pháp khác");
+          return false;
+        }
+        
         try {
-          if (html5QrCode) await html5QrCode.stop();
-          await html5QrCode.start(
-            { facingMode: "user" }, // camera trước
-            { fps: 15, qrbox: { width: 280, height: 280 } },
-            onScanSuccess,
-            onScanError
-          );
-          loadingDiv.style.display = 'none';
-        } catch (e) {
-          loadingDiv.innerHTML = '❌ Lỗi: Không tìm thấy camera nào. Hãy kiểm tra quyền truy cập.';
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: 'environment' }
+          });
+          currentStream = stream;
+          videoElement.srcObject = stream;
+          await videoElement.play();
+          setStatus("📷 Native scanner đã sẵn sàng");
+          
+          const detector = new BarcodeDetector({ formats: ['qr_code'] });
+          let lastTime = 0;
+          const interval = 150; // ms giữa các lần quét
+            
+          const scan = async () => {
+            if (!scanning) return;
+            requestAnimationFrame(async () => {
+              if (!scanning) return;
+              const now = Date.now();
+              if (now - lastTime < interval) {
+                requestAnimationFrame(scan);
+                return;
+              }
+              lastTime = now;
+              if (videoElement.readyState === 4 && videoElement.videoWidth > 0) {
+                try {
+                  const barcodes = await detector.detect(videoElement);
+                  if (barcodes.length > 0 && scanning) {
+                    const code = barcodes[0].rawValue;
+                    onCodeFound(code);
+                    return;
+                  }
+                } catch (err) {
+                  // lỗi nhẹ, bỏ qua
+                }
+              }
+              requestAnimationFrame(scan);
+            });
+          };
+          requestAnimationFrame(scan);
+          return true;
+        } catch (err) {
+          console.error("Lỗi native scanner:", err);
+          setStatus("⚠️ Lỗi camera native, chuyển sang chế độ dự phòng", true);
+          return false;
         }
       }
-    }
 
-    // Đóng popup khi bấm nút
-    document.getElementById('closeBtn').onclick = () => window.close();
-
-    // Khởi động quét khi trang load
-    startScanner();
-
-    // Dọn dẹp khi popup bị đóng đột ngột
-    window.addEventListener('beforeunload', () => {
-      if (html5QrCode && html5QrCode.isScanning) {
-        html5QrCode.stop().catch(e => console.warn(e));
+      // ========== PHƯƠNG PHÁP 2: Dự phòng dùng canvas + jsQR (nhẹ, kiểm soát giao diện) ==========
+      async function startFallbackScanner() {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: 'environment' }
+          });
+          currentStream = stream;
+          videoElement.srcObject = stream;
+          await videoElement.play();
+          setStatus("🔄 Chế độ dự phòng (cnv+jsQR)");
+          
+          // Tải jsQR từ CDN (nhẹ hơn html5-qrcode)
+          await new Promise((resolve, reject) => {
+            const script = document.createElement('script');
+            script.src = 'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js';
+            script.onload = resolve;
+            script.onerror = reject;
+            document.head.appendChild(script);
+          });
+          
+          let lastTime = 0;
+          const interval = 120;
+          
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          
+          const scanFrame = async () => {
+            if (!scanning) return;
+            requestAnimationFrame(async () => {
+              if (!scanning) return;
+              const now = Date.now();
+              if (now - lastTime < interval) {
+                requestAnimationFrame(scanFrame);
+                return;
+              }
+              lastTime = now;
+              if (videoElement.readyState === 4 && videoElement.videoWidth > 0) {
+                canvas.width = videoElement.videoWidth;
+                canvas.height = videoElement.videoHeight;
+                ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                const code = jsQR(imageData.data, canvas.width, canvas.height, {
+                  inversionAttempts: 'dontInvert',
+                });
+                if (code && scanning) {
+                  onCodeFound(code.data);
+                  return;
+                }
+              }
+              requestAnimationFrame(scanFrame);
+            });
+          };
+          requestAnimationFrame(scanFrame);
+          return true;
+        } catch (err) {
+          console.error("Fallback scanner lỗi:", err);
+          setStatus("❌ Không thể truy cập camera", true);
+          return false;
+        }
       }
-    });
+
+      // Khởi động
+      (async () => {
+        const loading = document.getElementById('loadingMsg');
+        loading.style.display = 'flex';
+        
+        let success = await startNativeScanner();
+        if (!success) {
+          success = await startFallbackScanner();
+        }
+        
+        if (!success) {
+          statusBadge.innerHTML = "❌ Không có camera hoặc bị từ chối quyền";
+          loading.innerHTML = '❌ Lỗi: Không thể khởi tạo camera';
+          loading.style.display = 'flex';
+        } else {
+          loading.style.display = 'none';
+        }
+      })();
+
+      document.getElementById('closeBtn').onclick = () => window.close();
+      
+      // Cleanup khi đóng trang
+      window.addEventListener('beforeunload', () => {
+        stopCamera();
+      });
+    })();
   </script>
 </body>
 </html>
