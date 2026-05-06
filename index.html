@@ -2,181 +2,116 @@
 <html lang="vi">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
-  <title>Quét QR CCCD - Nhanh & Chính xác</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      background: #000;
-      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-      height: 100vh;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-    }
-    .header {
-      text-align: center;
-      padding: 15px;
-      background: #111;
-      color: white;
-      font-size: 1.2rem;
-      font-weight: bold;
-      z-index: 10;
-    }
-    .camera-container {
-      flex: 1;
-      position: relative;
-      background: #000;
-      overflow: hidden;
-    }
-    video {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      display: block;
-    }
-    .scan-frame {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      width: 70%;
-      max-width: 280px;
-      height: 70%;
-      max-height: 280px;
-      border: 2px solid #4caf50;
-      border-radius: 20px;
-      box-shadow: 0 0 0 100vmax rgba(0,0,0,0.5);
-      pointer-events: none;
-      z-index: 10;
-    }
-    .controls {
-      padding: 15px;
-      background: #111;
-      display: flex;
-      justify-content: center;
-      gap: 15px;
-      z-index: 10;
-    }
-    button {
-      background: #d90429;
-      border: none;
-      color: white;
-      padding: 8px 20px;
-      border-radius: 30px;
-      font-size: 14px;
-      font-weight: bold;
-      cursor: pointer;
-    }
-    .info {
-      text-align: center;
-      padding: 8px;
-      font-size: 12px;
-      background: #000000aa;
-      color: #ddd;
-    }
-    .loading {
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      background: rgba(0,0,0,0.8);
-      padding: 12px 20px;
-      border-radius: 30px;
-      color: white;
-      z-index: 20;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-    .spinner {
-      width: 20px;
-      height: 20px;
-      border: 2px solid #fff;
-      border-top: 2px solid transparent;
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
-  </style>
-  <!-- Sử dụng thư viện qr-scanner mới nhất -->
-  <script type="importmap">
-    {
-      "imports": {
-        "qr-scanner": "https://cdn.jsdelivr.net/npm/qr-scanner@1.4.2/qr-scanner.min.js"
-      }
-    }
-  </script>
-</head>
-<body>
-  <div class="header">📷 QUÉT MÃ QR CCCD</div>
-  <div class="camera-container">
-    <video id="video" playsinline muted></video>
-    <div class="scan-frame"></div>
-  </div>
-  <div class="controls">
-    <button id="closeBtn">Đóng</button>
-  </div>
-  <div class="info">✅ Đưa mã QR vào khung xanh · 🔄 Tự động quét, nhanh và chính xác hơn</div>
-  <div id="loadingMsg" class="loading">
-    <div class="spinner"></div> Đang khởi tạo camera...
-  </div>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Quét QR CCCD</title>
 
-  <script type="module">
-    import QrScanner from 'qr-scanner';
-    
-    let scanner = null;
-    const videoElement = document.getElementById('video');
-    const loadingDiv = document.getElementById('loadingMsg');
-    
-    async function startScanner() {
-      try {
-        // Khởi tạo scanner với video element
-        scanner = new QrScanner(
-          videoElement,
-          result => {
-            // ----- QUÉT THÀNH CÔNG! -----
-            // Gửi dữ liệu về cửa sổ chính
-            if (window.opener && !window.opener.closed) {
-              window.opener.postMessage({ type: 'qr-scanned', value: result.data }, '*');
-            }
-            // Đóng popup ngay lập tức, không cần thông báo gì thêm
-            window.close();
-          },
-          {
-            onDecodeError: (error) => {
-              // Bạn có thể log lỗi ra console để debug nếu cần
-              // console.debug('QR decode error:', error);
-            },
-            highlightScanRegion: true, // Làm nổi bật vùng quét
-            highlightCodeOutline: true, // Viền khi tìm thấy QR
-            preferredCamera: 'environment', // Ưu tiên camera sau
-            maxScansPerSecond: 10, // Quét 10 khung hình/giây, cân bằng hiệu năng
-          }
-        );
-        
-        // Bắt đầu quét
-        await scanner.start();
-        loadingDiv.style.display = 'none';
-      } catch (err) {
-        loadingDiv.innerHTML = '❌ Lỗi: Không thể truy cập camera hoặc thiết bị không hỗ trợ.';
-        console.error('Lỗi khởi tạo scanner:', err);
-      }
+  <script src="https://unpkg.com/html5-qrcode"></script>
+
+  <style>
+    body {
+      margin: 0;
+      background: #000;
+      font-family: sans-serif;
+      text-align: center;
+      color: white;
     }
-    
-    // Đóng popup khi bấm nút
-    document.getElementById('closeBtn').onclick = () => window.close();
-    
-    // Khởi chạy ngay khi trang tải xong
-    startScanner();
-    
-    // Dọn dẹp một chút nếu popup bị đóng đột ngột
-    window.addEventListener('beforeunload', () => {
-      if (scanner) {
-        scanner.stop();
-        scanner.destroy();
+
+    #reader {
+      width: 100%;
+      max-width: 400px;
+      margin: auto;
+    }
+
+    .title {
+      padding: 10px;
+      font-size: 18px;
+      font-weight: bold;
+    }
+
+    button {
+      margin-top: 15px;
+      padding: 10px 20px;
+      border: none;
+      border-radius: 30px;
+      background: #d90429;
+      color: white;
+      font-weight: bold;
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="title">📷 Quét QR CCCD</div>
+<div id="reader"></div>
+<button onclick="closeWindow()">Đóng</button>
+
+<script>
+  let qr;
+
+  function onScanSuccess(decodedText) {
+    console.log("QR:", decodedText);
+
+    // STOP NGAY để tránh quét lại
+    qr.stop().then(() => {
+
+      // Gửi dữ liệu về Apps Script
+      if (window.opener) {
+        window.opener.postMessage({
+          type: "qr-scanned",
+          value: decodedText
+        }, "*");
+
+        window.close();
+      } else {
+        alert("Không tìm thấy cửa sổ cha");
+      }
+
+    });
+  }
+
+  function startScan() {
+    qr = new Html5Qrcode("reader");
+
+    const config = {
+      fps: 10, // giảm fps để tăng độ ổn định
+      qrbox: { width: 280, height: 280 },
+
+      // 🔥 QUAN TRỌNG: giúp nhận QR CCCD tốt hơn
+      formatsToSupport: [ Html5QrcodeSupportedFormats.QR_CODE ],
+
+      // 🔥 FIX nhận QR mờ
+      experimentalFeatures: {
+        useBarCodeDetectorIfSupported: true
+      }
+    };
+
+    Html5Qrcode.getCameras().then(devices => {
+      if (devices.length) {
+
+        // ưu tiên camera sau
+        let cameraId = devices[devices.length - 1].id;
+
+        qr.start(cameraId, config, onScanSuccess)
+          .catch(err => {
+            console.error(err);
+            alert("Không mở được camera");
+          });
+
       }
     });
-  </script>
+  }
+
+  function closeWindow() {
+    if (qr) {
+      qr.stop().then(() => window.close());
+    } else {
+      window.close();
+    }
+  }
+
+  window.onload = startScan;
+</script>
+
 </body>
 </html>
