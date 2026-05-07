@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
-  <title>Quét QR CCCD - Siêu tốc</title>
+  <title>Quét QR CCCD - Đọc được bản in</title>
   <style>
     * {
       margin: 0;
@@ -195,7 +195,7 @@
   </style>
 </head>
 <body>
-  <div class="header">📷 QUÉT MÃ QR CCCD - TỐC ĐỘ CAO</div>
+  <div class="header">📷 QUÉT MÃ QR CCCD - ĐỌC ĐƯỢC BẢN IN</div>
   <div class="camera-container">
     <video id="video" playsinline muted></video>
     <div class="overlay">
@@ -203,19 +203,18 @@
         <div class="scan-line"></div>
       </div>
     </div>
-    <div class="status-badge" id="statusBadge">⚙️ Đang khởi tạo công cụ quét...</div>
+    <div class="status-badge" id="statusBadge">⚙️ Đang khởi tạo...</div>
   </div>
   <div class="controls">
     <button id="closeBtn">Đóng</button>
   </div>
-  <div class="info">✅ Đưa mã QR vào khung xanh · Quét siêu tốc, nhận diện QR nhỏ tốt nhất</div>
+  <div class="info">✅ Đưa mã QR vào khung xanh · Tự động tăng độ tương phản để đọc bản in</div>
   <div id="loadingMsg" class="loading" style="display: none;">
     <div class="spinner"></div> Đang xử lý...
   </div>
 
   <script>
     (function() {
-      // Biến toàn cục
       let scanner = null;
       let currentStream = null;
       let scanning = true;
@@ -234,26 +233,37 @@
         if (!scanning) return;
         scanning = false;
         
-        // Dừng camera và scanner
         if (scanner && scanner.stop) scanner.stop();
         if (currentStream) {
           currentStream.getTracks().forEach(t => t.stop());
           currentStream = null;
         }
         
-        // Gửi kết quả về window.opener
         if (window.opener && !window.opener.closed) {
           window.opener.postMessage({ type: 'qr-scanned', value: code }, '*');
         }
-        // Đóng popup
         window.close();
       }
       
-      // ---------- Fallback dùng jsQR (đã hoạt động tốt) ----------
+      // ========== TĂNG CONTRAST TRÊN CANVAS ==========
+      function enhanceContrast(canvasElement, factor = 1.6) {
+        const ctx = canvasElement.getContext('2d');
+        const imageData = ctx.getImageData(0, 0, canvasElement.width, canvasElement.height);
+        const data = imageData.data;
+        for (let i = 0; i < data.length; i += 4) {
+          // Tăng contrast cho từng kênh màu
+          data[i]   = Math.min(255, Math.max(0, (data[i] - 128) * factor + 128));
+          data[i+1] = Math.min(255, Math.max(0, (data[i+1] - 128) * factor + 128));
+          data[i+2] = Math.min(255, Math.max(0, (data[i+2] - 128) * factor + 128));
+        }
+        ctx.putImageData(imageData, 0, 0);
+        return canvasElement;
+      }
+      
+      // ========== FALLBACK JSQR (có zoom + tăng contrast) ==========
       async function startJsQRFallback() {
-        setStatus("🔄 Đang dùng chế độ dự phòng (jsQR)");
+        setStatus("🔄 Chế độ dự phòng (jsQR + tăng độ tương phản)");
         isUsingFallback = true;
-        
         try {
           const stream = await navigator.mediaDevices.getUserMedia({
             video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
@@ -261,9 +271,8 @@
           currentStream = stream;
           video.srcObject = stream;
           await video.play();
-          setStatus("✅ Camera sẵn sàng (jsQR zoom)");
+          setStatus("✅ Camera sẵn sàng (jsQR nâng cao)");
           
-          // Tải jsQR nếu chưa có
           if (typeof jsQR === 'undefined') {
             await new Promise((resolve, reject) => {
               const script = document.createElement('script');
@@ -276,7 +285,7 @@
           
           const canvas = document.createElement('canvas');
           const ctx = canvas.getContext('2d');
-          const ZOOM = 2.0; // zoom 2x để đọc QR nhỏ
+          const ZOOM = 2.0;
           let lastTime = 0;
           const interval = 100;
           
@@ -296,6 +305,8 @@
                 canvas.width = vw;
                 canvas.height = vh;
                 ctx.drawImage(video, sx, sy, cropW, cropH, 0, 0, vw, vh);
+                // Tăng contrast trước khi quét
+                enhanceContrast(canvas, 1.5);
                 const imageData = ctx.getImageData(0, 0, vw, vh);
                 const code = jsQR(imageData.data, vw, vh, { inversionAttempts: 'dontInvert' });
                 if (code && scanning) {
@@ -315,14 +326,12 @@
         }
       }
       
-      // ---------- Phương thức chính: dùng qr-scanner (tải dynamic) ----------
+      // ========== QR-SCANNER (chính) với onDecode để tăng contrast ==========
       async function startQrScanner() {
         try {
-          // Tải thư viện qr-scanner bằng cách dynamic import (hoặc script)
           const module = await import('https://cdn.jsdelivr.net/npm/qr-scanner@1.4.2/qr-scanner.min.js');
           const QrScanner = module.default;
           
-          // Kiểm tra hỗ trợ camera
           if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
             throw new Error("Trình duyệt không hỗ trợ camera");
           }
@@ -331,31 +340,36 @@
             video,
             result => onCodeFound(result.data),
             {
-              onDecodeError: (err) => { /* im lặng */ },
+              onDecodeError: (err) => {},
               highlightScanRegion: true,
               highlightCodeOutline: true,
               maxScansPerSecond: 15,
               preferredCamera: 'environment',
-              returnDetailedScanResult: false
+              returnDetailedScanResult: false,
+              // ---- QUAN TRỌNG: TĂNG CONTRAST TRƯỚC KHI GIẢI MÃ ----
+              calculateScanRegion: () => QrScanner.SCAN_DEFAULT_REGION,
+              onDecode: (canvasElement) => {
+                // Áp dụng tăng contrast mạnh hơn cho bản in (hệ số 1.6)
+                return enhanceContrast(canvasElement, 1.6);
+              }
             }
           );
           
-          // Kiểm tra native scanner để hiển thị trạng thái
           if (QrScanner.hasNativeScanner()) {
-            setStatus('✅ Native Turbo - Đang quét');
+            setStatus('✅ Native Turbo + Tăng contrast - Sẵn sàng');
           } else {
-            setStatus('✅ ZXing Engine - Đang quét');
+            setStatus('✅ ZXing Engine + Tăng contrast - Sẵn sàng');
           }
           
           await scanner.start();
           return true;
         } catch (err) {
-          console.warn("qr-scanner thất bại, fallback sang jsQR:", err);
+          console.warn("qr-scanner thất bại:", err);
           return false;
         }
       }
       
-      // Khởi động chính
+      // KHỞI ĐỘNG
       (async () => {
         loadingDiv.style.display = 'flex';
         let success = await startQrScanner();
