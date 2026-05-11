@@ -229,12 +229,13 @@
         statusBadge.style.color = isError ? '#ff8888' : '#aaffaa';
       }
       
-      // ==================== SỬA: chỉ tắt camera, KHÔNG đóng webview ====================
+      // ==================== HÀM XỬ LÝ SAU KHI QUÉT THÀNH CÔNG ====================
+      // Chỉ tắt camera, gửi dữ liệu, KHÔNG đóng webview
       async function onCodeFound(code) {
         if (!scanning) return;
         scanning = false;
         
-        setStatus("✅ Đã quét thành công! Nhấn 'Đóng' để tiếp tục");
+        setStatus("✅ Đã quét thành công! Bạn có thể đóng cửa sổ này.");
         
         try {
           // Rung nhẹ điện thoại
@@ -277,10 +278,14 @@
               type: 'qr-scanned',
               value: code
             }, '*');
+            // Focus lại cửa sổ cha để người dùng tiếp tục nhập
+            try {
+              window.opener.focus();
+            } catch(e) {}
           }
           
-          // KHÔNG tự động đóng webview nữa
-          // Người dùng sẽ bấm nút "Đóng" để thoát
+          // KHÔNG tự động đóng webview - giữ nguyên để người dùng tự đóng
+          // Người dùng sẽ bấm nút "Đóng" khi muốn thoát
           
         } catch(err) {
           console.error("Lỗi khi dừng camera:", err);
@@ -419,7 +424,8 @@
         }
       })();
       
-      // ==================== NÚT ĐÓNG - đóng webview ====================
+      // ==================== NÚT ĐÓNG ====================
+      // Đóng webview an toàn, không ảnh hưởng đến trang cha
       document.getElementById('closeBtn').onclick = async () => {
         scanning = false;
         try {
@@ -439,15 +445,22 @@
             video.load();
           }
         } catch(e) {}
-        // Đóng webview (Zalo Mini App hoặc trình duyệt)
-        if (window.ZaloJavaScriptInterface) {
+        
+        // Đóng cửa sổ (popup)
+        try {
+          if (window.ZaloJavaScriptInterface) {
+            // Zalo Mini App: dùng lệnh đóng webview chuyên dụng
+            window.ZaloJavaScriptInterface.close();
+          } else {
+            window.close();
+          }
+        } catch(e) {
+          // Nếu không đóng được, thử history.back
           history.back();
-        } else {
-          window.close();
         }
       };
       
-      // ==================== SỬA beforeunload ====================
+      // ==================== beforeunload ====================
       window.addEventListener('beforeunload', async () => {
         scanning = false;
         try {
