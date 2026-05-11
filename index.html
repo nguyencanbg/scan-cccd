@@ -229,106 +229,90 @@
         statusBadge.style.color = isError ? '#ff8888' : '#aaffaa';
       }
       
+      // ==================== SỬA HÀM onCodeFound THEO YÊU CẦU ====================
       async function onCodeFound(code) {
+        if (!scanning) return;
+        scanning = false;
 
-  if (!scanning) return;
+        setStatus("✅ Đã quét thành công");
 
-  scanning = false;
-
-  setStatus("✅ Đã quét thành công");
-
-  try {
-
-    // Rung nhẹ điện thoại
-    if (navigator.vibrate) {
-      navigator.vibrate(200);
-    }
-
-    // =========================
-    // DỪNG QR SCANNER
-    // =========================
-    if (scanner) {
-
-      try {
-        await scanner.stop();
-      } catch(e) {
-        console.warn("scanner.stop lỗi:", e);
-      }
-
-      try {
-        scanner.destroy();
-      } catch(e) {
-        console.warn("scanner.destroy lỗi:", e);
-      }
-
-      scanner = null;
-    }
-
-    // =========================
-    // DỪNG TOÀN BỘ CAMERA STREAM
-    // =========================
-    if (currentStream) {
-
-      currentStream.getTracks().forEach(track => {
         try {
-          track.stop();
-        } catch(e) {}
-      });
+          // Rung nhẹ điện thoại
+          if (navigator.vibrate) {
+            navigator.vibrate(200);
+          }
 
-      currentStream = null;
-    }
+          // =========================
+          // DỪNG QR SCANNER
+          // =========================
+          if (scanner) {
+            try {
+              await scanner.stop();
+            } catch(e) {
+              console.warn("scanner.stop lỗi:", e);
+            }
 
-    // =========================
-    // XÓA VIDEO SRC
-    // =========================
-    if (video) {
-      video.pause();
+            try {
+              scanner.destroy();
+            } catch(e) {
+              console.warn("scanner.destroy lỗi:", e);
+            }
 
-      if (video.srcObject) {
-        video.srcObject = null;
+            scanner = null;
+          }
+
+          // =========================
+          // DỪNG TOÀN BỘ CAMERA STREAM
+          // =========================
+          if (currentStream) {
+            currentStream.getTracks().forEach(track => {
+              try {
+                track.stop();
+              } catch(e) {}
+            });
+            currentStream = null;
+          }
+
+          // =========================
+          // XÓA VIDEO SRC
+          // =========================
+          if (video) {
+            video.pause();
+            if (video.srcObject) {
+              video.srcObject = null;
+            }
+            video.removeAttribute('src');
+            video.load();
+          }
+
+          // Chờ camera release hoàn toàn
+          await new Promise(resolve => setTimeout(resolve, 300));
+
+          // =========================
+          // GỬI DỮ LIỆU VỀ FORM CHA
+          // =========================
+          if (window.opener && !window.opener.closed) {
+            window.opener.postMessage({
+              type: 'qr-scanned',
+              value: code
+            }, '*');
+          }
+
+          // =========================
+          // ĐÓNG WEBVIEW / TAB
+          // =========================
+          // Zalo Mini App
+          if (window.ZaloJavaScriptInterface) {
+            history.back();
+          } else {
+            // Chrome bình thường
+            window.close();
+          }
+
+        } catch(err) {
+          console.error("Lỗi khi đóng scanner:", err);
+        }
       }
-
-      video.removeAttribute('src');
-      video.load();
-    }
-
-    // Chờ camera release hoàn toàn
-    await new Promise(resolve => setTimeout(resolve, 300));
-
-    // =========================
-    // GỬI DỮ LIỆU VỀ FORM CHA
-    // =========================
-    if (window.opener && !window.opener.closed) {
-
-      window.opener.postMessage({
-        type: 'qr-scanned',
-        value: code
-      }, '*');
-
-    }
-
-    // =========================
-    // ĐÓNG WEBVIEW / TAB
-    // =========================
-
-    // Zalo Mini App
-    if (window.ZaloJavaScriptInterface) {
-
-      history.back();
-
-    } else {
-
-      // Chrome bình thường
-      window.close();
-
-    }
-
-  } catch(err) {
-
-    console.error("Lỗi khi đóng scanner:", err);
-
-  }
-}
       
       // ========== TĂNG CONTRAST TRÊN CANVAS ==========
       function enhanceContrast(canvasElement, factor = 1.6) {
@@ -431,7 +415,6 @@
               maxScansPerSecond: 15,
               preferredCamera: 'environment',
               returnDetailedScanResult: false,
-              // ---- QUAN TRỌNG: TĂNG CONTRAST TRƯỚC KHI GIẢI MÃ ----
               calculateScanRegion: () => QrScanner.SCAN_DEFAULT_REGION,
               onDecode: (canvasElement) => {
                 // Áp dụng tăng contrast mạnh hơn cho bản in (hệ số 1.6)
@@ -467,10 +450,79 @@
         }
       })();
       
-      document.getElementById('closeBtn').onclick = () => window.close();
-      window.addEventListener('beforeunload', () => {
-        if (scanner && scanner.stop) scanner.stop();
-        if (currentStream) currentStream.getTracks().forEach(t => t.stop());
+      // ==================== SỬA NÚT ĐÓNG THEO YÊU CẦU ====================
+      document.getElementById('closeBtn').onclick = async () => {
+        scanning = false;
+
+        try {
+          if (scanner) {
+            try {
+              await scanner.stop();
+            } catch(e) {}
+
+            try {
+              scanner.destroy();
+            } catch(e) {}
+
+            scanner = null;
+          }
+
+          if (currentStream) {
+            currentStream.getTracks().forEach(track => {
+              try {
+                track.stop();
+              } catch(e) {}
+            });
+            currentStream = null;
+          }
+
+          if (video) {
+            video.pause();
+            if (video.srcObject) {
+              video.srcObject = null;
+            }
+            video.removeAttribute('src');
+            video.load();
+          }
+        } catch(e) {}
+
+        if (window.ZaloJavaScriptInterface) {
+          history.back();
+        } else {
+          window.close();
+        }
+      };
+      
+      // ==================== SỬA beforeunload THEO YÊU CẦU ====================
+      window.addEventListener('beforeunload', async () => {
+        scanning = false;
+
+        try {
+          if (scanner) {
+            try {
+              await scanner.stop();
+            } catch(e) {}
+
+            try {
+              scanner.destroy();
+            } catch(e) {}
+
+            scanner = null;
+          }
+
+          if (currentStream) {
+            currentStream.getTracks().forEach(track => {
+              try {
+                track.stop();
+              } catch(e) {}
+            });
+            currentStream = null;
+          }
+
+          if (video && video.srcObject) {
+            video.srcObject = null;
+          }
+        } catch(e) {}
       });
     })();
   </script>
