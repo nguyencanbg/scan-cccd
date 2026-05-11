@@ -3,9 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
-  <title>Quét QR CCCD - Đọc bản in</title>
+  <title>Quét QR CCCD - Đọc được bản in</title>
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
 
     body {
       background: #000;
@@ -133,7 +137,9 @@
       box-shadow: 0 2px 8px rgba(0,0,0,0.3);
     }
 
-    button:active { transform: scale(0.96); }
+    button:active {
+      transform: scale(0.96);
+    }
 
     .info {
       text-align: center;
@@ -186,27 +192,10 @@
     }
 
     @keyframes spin { to { transform: rotate(360deg); } }
-
-    .toast-message {
-      position: fixed;
-      bottom: 80px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: rgba(0,0,0,0.85);
-      backdrop-filter: blur(10px);
-      color: #4caf50;
-      padding: 8px 20px;
-      border-radius: 40px;
-      font-size: 14px;
-      z-index: 40;
-      white-space: nowrap;
-      font-weight: 500;
-      pointer-events: none;
-    }
   </style>
 </head>
 <body>
-  <div class="header">📷 QUÉT MÃ QR CCCD - ĐỌC BẢN IN</div>
+  <div class="header">📷 QUÉT MÃ QR CCCD - ĐỌC ĐƯỢC BẢN IN</div>
   <div class="camera-container">
     <video id="video" playsinline muted></video>
     <div class="overlay">
@@ -219,7 +208,7 @@
   <div class="controls">
     <button id="closeBtn">Đóng</button>
   </div>
-  <div class="info">✅ Đưa mã QR vào khung · Tự động tăng độ tương phản để đọc bản in</div>
+  <div class="info">✅ Đưa mã QR vào khung xanh · Tự động tăng độ tương phản để đọc bản in</div>
   <div id="loadingMsg" class="loading" style="display: none;">
     <div class="spinner"></div> Đang xử lý...
   </div>
@@ -229,7 +218,7 @@
       let scanner = null;
       let currentStream = null;
       let scanning = true;
-      let closeWindowTimeout = null;
+      let isUsingFallback = false;
       
       const video = document.getElementById('video');
       const statusBadge = document.getElementById('statusBadge');
@@ -240,55 +229,68 @@
         statusBadge.style.color = isError ? '#ff8888' : '#aaffaa';
       }
       
-      function showToast(msg, isSuccess = true) {
-        const toast = document.createElement('div');
-        toast.className = 'toast-message';
-        toast.style.color = isSuccess ? '#4caf50' : '#ff8888';
-        toast.innerText = msg;
-        document.body.appendChild(toast);
-        setTimeout(() => toast.remove(), 2000);
-      }
-      
-      function closeScannerWindow() {
+      // ==================== SỬA HÀM onCodeFound (async) ====================
+      async function onCodeFound(code) {
         if (!scanning) return;
         scanning = false;
         
-        // Dừng scanner và camera
-        if (scanner && scanner.stop) scanner.stop();
-        if (currentStream) {
-          currentStream.getTracks().forEach(t => t.stop());
-          currentStream = null;
-        }
+        setStatus("✅ Đã quét thành công");
         
-        // Thử đóng cửa sổ
         try {
+          // Rung nhẹ điện thoại
+          if (navigator.vibrate) {
+            navigator.vibrate(200);
+          }
+          
+          // Dừng QR Scanner
+          if (scanner) {
+            try {
+              await scanner.stop();
+            } catch(e) { console.warn("scanner.stop lỗi:", e); }
+            try {
+              scanner.destroy();
+            } catch(e) { console.warn("scanner.destroy lỗi:", e); }
+            scanner = null;
+          }
+          
+          // Dừng tất cả track camera
+          if (currentStream) {
+            currentStream.getTracks().forEach(track => {
+              try { track.stop(); } catch(e) {}
+            });
+            currentStream = null;
+          }
+          
+          // Xóa video src
+          if (video) {
+            video.pause();
+            if (video.srcObject) {
+              video.srcObject = null;
+            }
+            video.removeAttribute('src');
+            video.load();
+          }
+          
+          // Chờ camera giải phóng hoàn toàn
+          await new Promise(resolve => setTimeout(resolve, 300));
+          
+          // Gửi dữ liệu về form cha (nếu có)
           if (window.opener && !window.opener.closed) {
-            // Gửi message về trang chủ trước
-            window.opener.postMessage({ type: 'qr-scanned', value: lastScannedCode }, '*');
+            window.opener.postMessage({
+              type: 'qr-scanned',
+              value: code
+            }, '*');
           }
-          // Đóng cửa sổ (có thể bị chặn trên Zalo Mini App)
-          window.close();
-        } catch(e) { console.warn("Không thể đóng popup tự động", e); }
-        
-        // Fallback: nếu không đóng được sau 0.5s, hiển thị nút "Đóng" và thoát
-        if (closeWindowTimeout) clearTimeout(closeWindowTimeout);
-        closeWindowTimeout = setTimeout(() => {
-          // Nếu cửa sổ vẫn mở, hiển thị thông báo và cho phép người dùng tự đóng
-          if (!window.closed) {
-            setStatus("✅ Đã quét thành công! Nhấn nút Đóng để tiếp tục", false);
-            showToast("Quét thành công! Nhấn Đóng để quay lại.");
+          
+          // Đóng webview/tab
+          if (window.ZaloJavaScriptInterface) {
+            history.back();
+          } else {
+            window.close();
           }
-        }, 500);
-      }
-      
-      let lastScannedCode = null;
-      
-      function onCodeFound(code) {
-        if (!scanning) return;
-        lastScannedCode = code;
-        showToast("✅ Quét thành công! Đang đóng...");
-        setStatus("✅ Quét thành công! Đang đóng...");
-        closeScannerWindow();
+        } catch(err) {
+          console.error("Lỗi khi đóng scanner:", err);
+        }
       }
       
       // ========== TĂNG CONTRAST TRÊN CANVAS ==========
@@ -307,7 +309,8 @@
       
       // ========== FALLBACK JSQR ==========
       async function startJsQRFallback() {
-        setStatus("🔄 Chế độ dự phòng (jsQR + tăng contrast)");
+        setStatus("🔄 Chế độ dự phòng (jsQR + tăng độ tương phản)");
+        isUsingFallback = true;
         try {
           const stream = await navigator.mediaDevices.getUserMedia({
             video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
@@ -383,7 +386,7 @@
             video,
             result => onCodeFound(result.data),
             {
-              onDecodeError: () => {},
+              onDecodeError: (err) => {},
               highlightScanRegion: true,
               highlightCodeOutline: true,
               maxScansPerSecond: 15,
@@ -421,15 +424,50 @@
         }
       })();
       
-      document.getElementById('closeBtn').onclick = () => {
-        if (scanner && scanner.stop) scanner.stop();
-        if (currentStream) currentStream.getTracks().forEach(t => t.stop());
-        window.close();
+      // ==================== SỬA NÚT ĐÓNG ====================
+      document.getElementById('closeBtn').onclick = async () => {
+        scanning = false;
+        try {
+          if (scanner) {
+            try { await scanner.stop(); } catch(e) {}
+            try { scanner.destroy(); } catch(e) {}
+            scanner = null;
+          }
+          if (currentStream) {
+            currentStream.getTracks().forEach(track => { try { track.stop(); } catch(e) {} });
+            currentStream = null;
+          }
+          if (video) {
+            video.pause();
+            if (video.srcObject) video.srcObject = null;
+            video.removeAttribute('src');
+            video.load();
+          }
+        } catch(e) {}
+        if (window.ZaloJavaScriptInterface) {
+          history.back();
+        } else {
+          window.close();
+        }
       };
       
-      window.addEventListener('beforeunload', () => {
-        if (scanner && scanner.stop) scanner.stop();
-        if (currentStream) currentStream.getTracks().forEach(t => t.stop());
+      // ==================== SỬA beforeunload ====================
+      window.addEventListener('beforeunload', async () => {
+        scanning = false;
+        try {
+          if (scanner) {
+            try { await scanner.stop(); } catch(e) {}
+            try { scanner.destroy(); } catch(e) {}
+            scanner = null;
+          }
+          if (currentStream) {
+            currentStream.getTracks().forEach(track => { try { track.stop(); } catch(e) {} });
+            currentStream = null;
+          }
+          if (video && video.srcObject) {
+            video.srcObject = null;
+          }
+        } catch(e) {}
       });
     })();
   </script>
