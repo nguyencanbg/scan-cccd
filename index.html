@@ -3,13 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
-  <title>Quét QR CCCD - Đọc được bản in</title>
+  <title>Quét QR CCCD - Đọc bản in</title>
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
 
     body {
       background: #000;
@@ -137,9 +133,7 @@
       box-shadow: 0 2px 8px rgba(0,0,0,0.3);
     }
 
-    button:active {
-      transform: scale(0.96);
-    }
+    button:active { transform: scale(0.96); }
 
     .info {
       text-align: center;
@@ -192,10 +186,27 @@
     }
 
     @keyframes spin { to { transform: rotate(360deg); } }
+
+    .toast-message {
+      position: fixed;
+      bottom: 80px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,0.85);
+      backdrop-filter: blur(10px);
+      color: #4caf50;
+      padding: 8px 20px;
+      border-radius: 40px;
+      font-size: 14px;
+      z-index: 40;
+      white-space: nowrap;
+      font-weight: 500;
+      pointer-events: none;
+    }
   </style>
 </head>
 <body>
-  <div class="header">📷 QUÉT MÃ QR CCCD - ĐỌC ĐƯỢC BẢN IN</div>
+  <div class="header">📷 QUÉT MÃ QR CCCD - ĐỌC BẢN IN</div>
   <div class="camera-container">
     <video id="video" playsinline muted></video>
     <div class="overlay">
@@ -208,7 +219,7 @@
   <div class="controls">
     <button id="closeBtn">Đóng</button>
   </div>
-  <div class="info">✅ Đưa mã QR vào khung xanh · Tự động tăng độ tương phản để đọc bản in</div>
+  <div class="info">✅ Đưa mã QR vào khung · Tự động tăng độ tương phản để đọc bản in</div>
   <div id="loadingMsg" class="loading" style="display: none;">
     <div class="spinner"></div> Đang xử lý...
   </div>
@@ -218,7 +229,7 @@
       let scanner = null;
       let currentStream = null;
       let scanning = true;
-      let isUsingFallback = false;
+      let closeWindowTimeout = null;
       
       const video = document.getElementById('video');
       const statusBadge = document.getElementById('statusBadge');
@@ -229,89 +240,55 @@
         statusBadge.style.color = isError ? '#ff8888' : '#aaffaa';
       }
       
-      // ==================== SỬA HÀM onCodeFound THEO YÊU CẦU ====================
-      async function onCodeFound(code) {
+      function showToast(msg, isSuccess = true) {
+        const toast = document.createElement('div');
+        toast.className = 'toast-message';
+        toast.style.color = isSuccess ? '#4caf50' : '#ff8888';
+        toast.innerText = msg;
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 2000);
+      }
+      
+      function closeScannerWindow() {
         if (!scanning) return;
         scanning = false;
-
-        setStatus("✅ Đã quét thành công");
-
-        try {
-          // Rung nhẹ điện thoại
-          if (navigator.vibrate) {
-            navigator.vibrate(200);
-          }
-
-          // =========================
-          // DỪNG QR SCANNER
-          // =========================
-          if (scanner) {
-            try {
-              await scanner.stop();
-            } catch(e) {
-              console.warn("scanner.stop lỗi:", e);
-            }
-
-            try {
-              scanner.destroy();
-            } catch(e) {
-              console.warn("scanner.destroy lỗi:", e);
-            }
-
-            scanner = null;
-          }
-
-          // =========================
-          // DỪNG TOÀN BỘ CAMERA STREAM
-          // =========================
-          if (currentStream) {
-            currentStream.getTracks().forEach(track => {
-              try {
-                track.stop();
-              } catch(e) {}
-            });
-            currentStream = null;
-          }
-
-          // =========================
-          // XÓA VIDEO SRC
-          // =========================
-          if (video) {
-            video.pause();
-            if (video.srcObject) {
-              video.srcObject = null;
-            }
-            video.removeAttribute('src');
-            video.load();
-          }
-
-          // Chờ camera release hoàn toàn
-          await new Promise(resolve => setTimeout(resolve, 300));
-
-          // =========================
-          // GỬI DỮ LIỆU VỀ FORM CHA
-          // =========================
-          if (window.opener && !window.opener.closed) {
-            window.opener.postMessage({
-              type: 'qr-scanned',
-              value: code
-            }, '*');
-          }
-
-          // =========================
-          // ĐÓNG WEBVIEW / TAB
-          // =========================
-          // Zalo Mini App
-          if (window.ZaloJavaScriptInterface) {
-            history.back();
-          } else {
-            // Chrome bình thường
-            window.close();
-          }
-
-        } catch(err) {
-          console.error("Lỗi khi đóng scanner:", err);
+        
+        // Dừng scanner và camera
+        if (scanner && scanner.stop) scanner.stop();
+        if (currentStream) {
+          currentStream.getTracks().forEach(t => t.stop());
+          currentStream = null;
         }
+        
+        // Thử đóng cửa sổ
+        try {
+          if (window.opener && !window.opener.closed) {
+            // Gửi message về trang chủ trước
+            window.opener.postMessage({ type: 'qr-scanned', value: lastScannedCode }, '*');
+          }
+          // Đóng cửa sổ (có thể bị chặn trên Zalo Mini App)
+          window.close();
+        } catch(e) { console.warn("Không thể đóng popup tự động", e); }
+        
+        // Fallback: nếu không đóng được sau 0.5s, hiển thị nút "Đóng" và thoát
+        if (closeWindowTimeout) clearTimeout(closeWindowTimeout);
+        closeWindowTimeout = setTimeout(() => {
+          // Nếu cửa sổ vẫn mở, hiển thị thông báo và cho phép người dùng tự đóng
+          if (!window.closed) {
+            setStatus("✅ Đã quét thành công! Nhấn nút Đóng để tiếp tục", false);
+            showToast("Quét thành công! Nhấn Đóng để quay lại.");
+          }
+        }, 500);
+      }
+      
+      let lastScannedCode = null;
+      
+      function onCodeFound(code) {
+        if (!scanning) return;
+        lastScannedCode = code;
+        showToast("✅ Quét thành công! Đang đóng...");
+        setStatus("✅ Quét thành công! Đang đóng...");
+        closeScannerWindow();
       }
       
       // ========== TĂNG CONTRAST TRÊN CANVAS ==========
@@ -320,7 +297,6 @@
         const imageData = ctx.getImageData(0, 0, canvasElement.width, canvasElement.height);
         const data = imageData.data;
         for (let i = 0; i < data.length; i += 4) {
-          // Tăng contrast cho từng kênh màu
           data[i]   = Math.min(255, Math.max(0, (data[i] - 128) * factor + 128));
           data[i+1] = Math.min(255, Math.max(0, (data[i+1] - 128) * factor + 128));
           data[i+2] = Math.min(255, Math.max(0, (data[i+2] - 128) * factor + 128));
@@ -329,10 +305,9 @@
         return canvasElement;
       }
       
-      // ========== FALLBACK JSQR (có zoom + tăng contrast) ==========
+      // ========== FALLBACK JSQR ==========
       async function startJsQRFallback() {
-        setStatus("🔄 Chế độ dự phòng (jsQR + tăng độ tương phản)");
-        isUsingFallback = true;
+        setStatus("🔄 Chế độ dự phòng (jsQR + tăng contrast)");
         try {
           const stream = await navigator.mediaDevices.getUserMedia({
             video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
@@ -374,7 +349,6 @@
                 canvas.width = vw;
                 canvas.height = vh;
                 ctx.drawImage(video, sx, sy, cropW, cropH, 0, 0, vw, vh);
-                // Tăng contrast trước khi quét
                 enhanceContrast(canvas, 1.5);
                 const imageData = ctx.getImageData(0, 0, vw, vh);
                 const code = jsQR(imageData.data, vw, vh, { inversionAttempts: 'dontInvert' });
@@ -395,7 +369,7 @@
         }
       }
       
-      // ========== QR-SCANNER (chính) với onDecode để tăng contrast ==========
+      // ========== QR-SCANNER CHÍNH ==========
       async function startQrScanner() {
         try {
           const module = await import('https://cdn.jsdelivr.net/npm/qr-scanner@1.4.2/qr-scanner.min.js');
@@ -409,17 +383,14 @@
             video,
             result => onCodeFound(result.data),
             {
-              onDecodeError: (err) => {},
+              onDecodeError: () => {},
               highlightScanRegion: true,
               highlightCodeOutline: true,
               maxScansPerSecond: 15,
               preferredCamera: 'environment',
               returnDetailedScanResult: false,
               calculateScanRegion: () => QrScanner.SCAN_DEFAULT_REGION,
-              onDecode: (canvasElement) => {
-                // Áp dụng tăng contrast mạnh hơn cho bản in (hệ số 1.6)
-                return enhanceContrast(canvasElement, 1.6);
-              }
+              onDecode: (canvasElement) => enhanceContrast(canvasElement, 1.6)
             }
           );
           
@@ -450,79 +421,15 @@
         }
       })();
       
-      // ==================== SỬA NÚT ĐÓNG THEO YÊU CẦU ====================
-      document.getElementById('closeBtn').onclick = async () => {
-        scanning = false;
-
-        try {
-          if (scanner) {
-            try {
-              await scanner.stop();
-            } catch(e) {}
-
-            try {
-              scanner.destroy();
-            } catch(e) {}
-
-            scanner = null;
-          }
-
-          if (currentStream) {
-            currentStream.getTracks().forEach(track => {
-              try {
-                track.stop();
-              } catch(e) {}
-            });
-            currentStream = null;
-          }
-
-          if (video) {
-            video.pause();
-            if (video.srcObject) {
-              video.srcObject = null;
-            }
-            video.removeAttribute('src');
-            video.load();
-          }
-        } catch(e) {}
-
-        if (window.ZaloJavaScriptInterface) {
-          history.back();
-        } else {
-          window.close();
-        }
+      document.getElementById('closeBtn').onclick = () => {
+        if (scanner && scanner.stop) scanner.stop();
+        if (currentStream) currentStream.getTracks().forEach(t => t.stop());
+        window.close();
       };
       
-      // ==================== SỬA beforeunload THEO YÊU CẦU ====================
-      window.addEventListener('beforeunload', async () => {
-        scanning = false;
-
-        try {
-          if (scanner) {
-            try {
-              await scanner.stop();
-            } catch(e) {}
-
-            try {
-              scanner.destroy();
-            } catch(e) {}
-
-            scanner = null;
-          }
-
-          if (currentStream) {
-            currentStream.getTracks().forEach(track => {
-              try {
-                track.stop();
-              } catch(e) {}
-            });
-            currentStream = null;
-          }
-
-          if (video && video.srcObject) {
-            video.srcObject = null;
-          }
-        } catch(e) {}
+      window.addEventListener('beforeunload', () => {
+        if (scanner && scanner.stop) scanner.stop();
+        if (currentStream) currentStream.getTracks().forEach(t => t.stop());
       });
     })();
   </script>
