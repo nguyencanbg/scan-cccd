@@ -229,79 +229,20 @@
         statusBadge.style.color = isError ? '#ff8888' : '#aaffaa';
       }
       
-      // ==================== HÀM xử lý sau khi quét thành công ====================
-      async function onCodeFound(code) {
+      function onCodeFound(code) {
         if (!scanning) return;
         scanning = false;
-
-        setStatus("✅ Đã quét thành công");
-
-        try {
-          // Rung nhẹ điện thoại
-          if (navigator.vibrate) {
-            navigator.vibrate(200);
-          }
-
-          // =========================
-          // DỪNG QR SCANNER
-          // =========================
-          if (scanner) {
-            try {
-              await scanner.stop();
-            } catch(e) {
-              console.warn("scanner.stop lỗi:", e);
-            }
-
-            try {
-              scanner.destroy();
-            } catch(e) {
-              console.warn("scanner.destroy lỗi:", e);
-            }
-
-            scanner = null;
-          }
-
-          // =========================
-          // DỪNG TOÀN BỘ CAMERA STREAM
-          // =========================
-          if (currentStream) {
-            currentStream.getTracks().forEach(track => {
-              try {
-                track.stop();
-              } catch(e) {}
-            });
-            currentStream = null;
-          }
-
-          // =========================
-          // XÓA VIDEO SRC
-          // =========================
-          if (video) {
-            video.pause();
-            if (video.srcObject) {
-              video.srcObject = null;
-            }
-            video.removeAttribute('src');
-            video.load();
-          }
-
-          // Chờ camera release hoàn toàn
-          await new Promise(resolve => setTimeout(resolve, 300));
-
-          // =========================
-          // LƯU DỮ LIỆU QR VÀO SESSIONSTORAGE (thay cho postMessage)
-          // =========================
-          sessionStorage.setItem('qr_scanned_data', code);
-
-          // ============================
-          // QUAY LẠI TRANG TRƯỚC (thay cho window.close)
-          // ============================
-          history.back();
-
-        } catch(err) {
-          console.error("Lỗi khi đóng scanner:", err);
-          setStatus("❌ Lỗi xử lý sau quét", true);
+        
+        if (scanner && scanner.stop) scanner.stop();
+        if (currentStream) {
+          currentStream.getTracks().forEach(t => t.stop());
+          currentStream = null;
         }
+        
+        if (window.opener && !window.opener.closed) {
+          window.opener.postMessage({ type: 'qr-scanned', value: code }, '*');
+        }
+        window.close();
       }
       
       // ========== TĂNG CONTRAST TRÊN CANVAS ==========
@@ -405,6 +346,7 @@
               maxScansPerSecond: 15,
               preferredCamera: 'environment',
               returnDetailedScanResult: false,
+              // ---- QUAN TRỌNG: TĂNG CONTRAST TRƯỚC KHI GIẢI MÃ ----
               calculateScanRegion: () => QrScanner.SCAN_DEFAULT_REGION,
               onDecode: (canvasElement) => {
                 // Áp dụng tăng contrast mạnh hơn cho bản in (hệ số 1.6)
@@ -440,76 +382,10 @@
         }
       })();
       
-      // ==================== NÚT ĐÓNG (cập nhật dùng history.back) ====================
-      document.getElementById('closeBtn').onclick = async () => {
-        scanning = false;
-
-        try {
-          if (scanner) {
-            try {
-              await scanner.stop();
-            } catch(e) {}
-
-            try {
-              scanner.destroy();
-            } catch(e) {}
-
-            scanner = null;
-          }
-
-          if (currentStream) {
-            currentStream.getTracks().forEach(track => {
-              try {
-                track.stop();
-              } catch(e) {}
-            });
-            currentStream = null;
-          }
-
-          if (video) {
-            video.pause();
-            if (video.srcObject) {
-              video.srcObject = null;
-            }
-            video.removeAttribute('src');
-            video.load();
-          }
-        } catch(e) {}
-
-        // Quay lại trang trước
-        history.back();
-      };
-      
-      // ==================== beforeunload dọn dẹp tài nguyên ====================
-      window.addEventListener('beforeunload', async () => {
-        scanning = false;
-
-        try {
-          if (scanner) {
-            try {
-              await scanner.stop();
-            } catch(e) {}
-
-            try {
-              scanner.destroy();
-            } catch(e) {}
-
-            scanner = null;
-          }
-
-          if (currentStream) {
-            currentStream.getTracks().forEach(track => {
-              try {
-                track.stop();
-              } catch(e) {}
-            });
-            currentStream = null;
-          }
-
-          if (video && video.srcObject) {
-            video.srcObject = null;
-          }
-        } catch(e) {}
+      document.getElementById('closeBtn').onclick = () => window.close();
+      window.addEventListener('beforeunload', () => {
+        if (scanner && scanner.stop) scanner.stop();
+        if (currentStream) currentStream.getTracks().forEach(t => t.stop());
       });
     })();
   </script>
