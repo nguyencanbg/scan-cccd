@@ -5,193 +5,28 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
   <title>Quét QR CCCD - Đọc được bản in</title>
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-
-    body {
-      background: #000;
-      font-family: system-ui, 'Segoe UI', -apple-system, sans-serif;
-      height: 100vh;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-    }
-
-    .header {
-      text-align: center;
-      padding: 15px;
-      background: rgba(0,0,0,0.8);
-      backdrop-filter: blur(10px);
-      color: white;
-      font-size: 1.2rem;
-      font-weight: 600;
-      z-index: 10;
-      border-bottom: 1px solid rgba(255,255,255,0.2);
-    }
-
-    .camera-container {
-      flex: 1;
-      position: relative;
-      background: #000;
-      overflow: hidden;
-    }
-
-    video {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      display: block;
-    }
-
-    .overlay {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      z-index: 20;
-      pointer-events: none;
-    }
-
-    .scan-frame {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      width: 280px;
-      height: 280px;
-      border-radius: 24px;
-      background: transparent;
-      box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.6);
-      border: 2px solid rgba(76, 175, 80, 0.9);
-    }
-
-    .scan-frame::before,
-    .scan-frame::after {
-      content: '';
-      position: absolute;
-      width: 40px;
-      height: 40px;
-      border-color: #4caf50;
-      border-style: solid;
-      border-width: 0;
-    }
-
-    .scan-frame::before {
-      top: -2px;
-      left: -2px;
-      border-top-width: 4px;
-      border-left-width: 4px;
-      border-radius: 8px 0 0 0;
-    }
-
-    .scan-frame::after {
-      bottom: -2px;
-      right: -2px;
-      border-bottom-width: 4px;
-      border-right-width: 4px;
-      border-radius: 0 0 8px 0;
-    }
-
-    .scan-line {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 3px;
-      background: linear-gradient(90deg, transparent, #4caf50, #4caf50, transparent);
-      animation: scan 2s linear infinite;
-      box-shadow: 0 0 6px #4caf50;
-    }
-
-    @keyframes scan {
-      0% { top: 0; }
-      50% { top: 100%; }
-      100% { top: 0; }
-    }
-
-    .controls {
-      padding: 15px;
-      background: rgba(0,0,0,0.8);
-      backdrop-filter: blur(10px);
-      display: flex;
-      justify-content: center;
-      gap: 15px;
-      z-index: 10;
-      border-top: 1px solid rgba(255,255,255,0.2);
-    }
-
-    button {
-      background: #d90429;
-      border: none;
-      color: white;
-      padding: 10px 28px;
-      border-radius: 40px;
-      font-size: 16px;
-      font-weight: bold;
-      cursor: pointer;
-      transition: 0.2s;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-    }
-
-    button:active {
-      transform: scale(0.96);
-    }
-
-    .info {
-      text-align: center;
-      padding: 8px;
-      font-size: 13px;
-      background: rgba(0,0,0,0.6);
-      color: #ccc;
-      backdrop-filter: blur(4px);
-    }
-
-    .status-badge {
-      position: absolute;
-      bottom: 20px;
-      left: 20px;
-      background: rgba(0,0,0,0.7);
-      padding: 6px 12px;
-      border-radius: 20px;
-      font-size: 12px;
-      color: #ffaa44;
-      z-index: 25;
-      font-family: monospace;
-      pointer-events: none;
-    }
-
-    .loading {
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      background: rgba(0,0,0,0.85);
-      backdrop-filter: blur(8px);
-      padding: 16px 24px;
-      border-radius: 40px;
-      color: white;
-      z-index: 30;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      font-size: 14px;
-      border: 1px solid rgba(255,255,255,0.2);
-    }
-
-    .spinner {
-      width: 20px;
-      height: 20px;
-      border: 2px solid #fff;
-      border-top: 2px solid #4caf50;
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-    }
-
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #000; font-family: system-ui, -apple-system, sans-serif; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+    .header { text-align: center; padding: 15px; background: rgba(0,0,0,0.8); backdrop-filter: blur(10px); color: white; font-size: 1.2rem; font-weight: 600; border-bottom: 1px solid rgba(255,255,255,0.2); }
+    .camera-container { flex: 1; position: relative; background: #000; overflow: hidden; }
+    video { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+    .scan-frame { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 280px; height: 280px; border-radius: 24px; background: transparent; box-shadow: 0 0 0 100vmax rgba(0,0,0,0.6); border: 2px solid rgba(76,175,80,0.9); }
+    .scan-frame::before, .scan-frame::after { content: ''; position: absolute; width: 40px; height: 40px; border-color: #4caf50; border-style: solid; border-width: 0; }
+    .scan-frame::before { top: -2px; left: -2px; border-top-width: 4px; border-left-width: 4px; border-radius: 8px 0 0 0; }
+    .scan-frame::after { bottom: -2px; right: -2px; border-bottom-width: 4px; border-right-width: 4px; border-radius: 0 0 8px 0; }
+    .scan-line { position: absolute; top: 0; left: 0; width: 100%; height: 3px; background: linear-gradient(90deg, transparent, #4caf50, #4caf50, transparent); animation: scan 2s linear infinite; box-shadow: 0 0 6px #4caf50; }
+    @keyframes scan { 0% { top: 0; } 50% { top: 100%; } 100% { top: 0; } }
+    .controls { padding: 15px; background: rgba(0,0,0,0.8); backdrop-filter: blur(10px); display: flex; justify-content: center; gap: 15px; border-top: 1px solid rgba(255,255,255,0.2); }
+    button { background: #d90429; border: none; color: white; padding: 10px 28px; border-radius: 40px; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.2s; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+    button:active { transform: scale(0.96); }
+    .info { text-align: center; padding: 8px; font-size: 13px; background: rgba(0,0,0,0.6); color: #ccc; backdrop-filter: blur(4px); }
+    .status-badge { position: absolute; bottom: 20px; left: 20px; background: rgba(0,0,0,0.7); padding: 6px 12px; border-radius: 20px; font-size: 12px; color: #ffaa44; font-family: monospace; pointer-events: none; }
+    .loading { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.85); backdrop-filter: blur(8px); padding: 16px 24px; border-radius: 40px; color: white; display: flex; align-items: center; gap: 12px; font-size: 14px; border: 1px solid rgba(255,255,255,0.2); z-index: 30; }
+    .spinner { width: 20px; height: 20px; border: 2px solid #fff; border-top: 2px solid #4caf50; border-radius: 50%; animation: spin 0.8s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
+    .toast-msg { position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%); background: #4caf50; color: white; padding: 10px 20px; border-radius: 40px; font-size: 14px; z-index: 40; animation: fadeOut 2s forwards; }
+    @keyframes fadeOut { 0% { opacity: 1; } 70% { opacity: 1; } 100% { opacity: 0; visibility: hidden; } }
   </style>
 </head>
 <body>
@@ -218,7 +53,7 @@
       let scanner = null;
       let currentStream = null;
       let scanning = true;
-      let isUsingFallback = false;
+      let scanned = false;
       
       const video = document.getElementById('video');
       const statusBadge = document.getElementById('statusBadge');
@@ -229,67 +64,30 @@
         statusBadge.style.color = isError ? '#ff8888' : '#aaffaa';
       }
       
-      // ==================== HÀM XỬ LÝ SAU KHI QUÉT THÀNH CÔNG ====================
-      // Chỉ tắt camera, gửi dữ liệu, KHÔNG đóng webview
+      function showToast(msg) {
+        const toast = document.createElement('div');
+        toast.className = 'toast-msg';
+        toast.innerText = msg;
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 2000);
+      }
+      
+      // ========== XỬ LÝ KHI QUÉT THÀNH CÔNG ==========
       async function onCodeFound(code) {
-        if (!scanning) return;
+        if (!scanning || scanned) return;
         scanning = false;
+        scanned = true;
+        setStatus("✅ Quét thành công! Nhấn [Đóng] để quay lại.");
+        showToast("✅ Quét thành công! Nhấn Đóng để quay lại.");
         
-        setStatus("✅ Đã quét thành công! Bạn có thể đóng cửa sổ này.");
-        
-        try {
-          // Rung nhẹ điện thoại
-          if (navigator.vibrate) {
-            navigator.vibrate(200);
-          }
-          
-          // Dừng QR Scanner
-          if (scanner) {
-            try {
-              await scanner.stop();
-            } catch(e) { console.warn("scanner.stop lỗi:", e); }
-            try {
-              scanner.destroy();
-            } catch(e) { console.warn("scanner.destroy lỗi:", e); }
-            scanner = null;
-          }
-          
-          // Dừng tất cả track camera
-          if (currentStream) {
-            currentStream.getTracks().forEach(track => {
-              try { track.stop(); } catch(e) {}
-            });
-            currentStream = null;
-          }
-          
-          // Xóa video src
-          if (video) {
-            video.pause();
-            if (video.srcObject) {
-              video.srcObject = null;
-            }
-            video.removeAttribute('src');
-            video.load();
-          }
-          
-          // Gửi dữ liệu về form cha (nếu có)
-          if (window.opener && !window.opener.closed) {
-            window.opener.postMessage({
-              type: 'qr-scanned',
-              value: code
-            }, '*');
-            // Focus lại cửa sổ cha để người dùng tiếp tục nhập
-            try {
-              window.opener.focus();
-            } catch(e) {}
-          }
-          
-          // KHÔNG tự động đóng webview - để người dùng tự bấm Đóng
-          
-        } catch(err) {
-          console.error("Lỗi khi dừng camera:", err);
-          setStatus("❌ Lỗi khi dừng camera", true);
+        // Gửi dữ liệu về trang cha (nếu mở bằng window.open)
+        if (window.opener && !window.opener.closed) {
+          window.opener.postMessage({ type: 'qr-scanned', value: code }, '*');
+        } else {
+          // fallback: lưu vào localStorage (đề phòng)
+          localStorage.setItem('qr_scanned_code', code);
         }
+        // KHÔNG TỰ ĐỘNG ĐÓNG - để người dùng nhấn nút Đóng
       }
       
       // ========== TĂNG CONTRAST TRÊN CANVAS ==========
@@ -309,7 +107,6 @@
       // ========== FALLBACK JSQR ==========
       async function startJsQRFallback() {
         setStatus("🔄 Chế độ dự phòng (jsQR + tăng độ tương phản)");
-        isUsingFallback = true;
         try {
           const stream = await navigator.mediaDevices.getUserMedia({
             video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
@@ -336,9 +133,9 @@
           const interval = 100;
           
           function scanFrame() {
-            if (!scanning) return;
+            if (!scanning || scanned) return;
             requestAnimationFrame(async () => {
-              if (!scanning) return;
+              if (!scanning || scanned) return;
               const now = Date.now();
               if (now - lastTime >= interval && video.readyState === 4 && video.videoWidth > 0) {
                 lastTime = now;
@@ -354,7 +151,7 @@
                 enhanceContrast(canvas, 1.5);
                 const imageData = ctx.getImageData(0, 0, vw, vh);
                 const code = jsQR(imageData.data, vw, vh, { inversionAttempts: 'dontInvert' });
-                if (code && scanning) {
+                if (code && !scanned) {
                   onCodeFound(code.data);
                   return;
                 }
@@ -414,66 +211,39 @@
       (async () => {
         loadingDiv.style.display = 'flex';
         let success = await startQrScanner();
-        if (!success) {
-          success = await startJsQRFallback();
-        }
+        if (!success) success = await startJsQRFallback();
         loadingDiv.style.display = 'none';
         if (!success) {
           setStatus("❌ Lỗi: Không thể truy cập camera", true);
         }
       })();
       
-      // ==================== NÚT ĐÓNG - đóng an toàn, không ảnh hưởng trang cha ====================
+      // ========== NÚT ĐÓNG (đóng popup an toàn) ==========
       document.getElementById('closeBtn').onclick = async () => {
         scanning = false;
-        try {
-          if (scanner) {
-            try { await scanner.stop(); } catch(e) {}
-            try { scanner.destroy(); } catch(e) {}
-            scanner = null;
-          }
-          if (currentStream) {
-            currentStream.getTracks().forEach(track => { try { track.stop(); } catch(e) {} });
-            currentStream = null;
-          }
-          if (video) {
-            video.pause();
-            if (video.srcObject) video.srcObject = null;
-            video.removeAttribute('src');
-            video.load();
-          }
-        } catch(e) {}
-        
-        // Đóng cửa sổ hiện tại (popup) bằng phương thức phù hợp với Zalo Mini App
-        try {
-          if (window.ZaloJavaScriptInterface && typeof window.ZaloJavaScriptInterface.close === 'function') {
-            window.ZaloJavaScriptInterface.close();
-          } else {
-            window.close();
-          }
-        } catch(e) {
-          // Fallback: nếu không đóng được, thử dùng history.back() hoặc ẩn
-          history.back();
+        if (scanner) {
+          try { await scanner.stop(); } catch(e) {}
+          try { scanner.destroy(); } catch(e) {}
+          scanner = null;
         }
+        if (currentStream) {
+          currentStream.getTracks().forEach(t => { try { t.stop(); } catch(e) {} });
+          currentStream = null;
+        }
+        if (video && video.srcObject) {
+          video.srcObject = null;
+        }
+        // Chỉ đóng popup, không can thiệp gì thêm
+        window.close();
       };
       
-      // ==================== beforeunload ====================
-      window.addEventListener('beforeunload', async () => {
-        scanning = false;
-        try {
-          if (scanner) {
-            try { await scanner.stop(); } catch(e) {}
-            try { scanner.destroy(); } catch(e) {}
-            scanner = null;
-          }
-          if (currentStream) {
-            currentStream.getTracks().forEach(track => { try { track.stop(); } catch(e) {} });
-            currentStream = null;
-          }
-          if (video && video.srcObject) {
-            video.srcObject = null;
-          }
-        } catch(e) {}
+      window.addEventListener('beforeunload', () => {
+        if (scanner) {
+          try { scanner.stop(); scanner.destroy(); } catch(e) {}
+        }
+        if (currentStream) {
+          currentStream.getTracks().forEach(t => { try { t.stop(); } catch(e) {} });
+        }
       });
     })();
   </script>
