@@ -229,21 +229,106 @@
         statusBadge.style.color = isError ? '#ff8888' : '#aaffaa';
       }
       
-      function onCodeFound(code) {
-        if (!scanning) return;
-        scanning = false;
-        
-        if (scanner && scanner.stop) scanner.stop();
-        if (currentStream) {
-          currentStream.getTracks().forEach(t => t.stop());
-          currentStream = null;
-        }
-        
-        if (window.opener && !window.opener.closed) {
-          window.opener.postMessage({ type: 'qr-scanned', value: code }, '*');
-        }
-        window.close();
+      async function onCodeFound(code) {
+
+  if (!scanning) return;
+
+  scanning = false;
+
+  setStatus("✅ Đã quét thành công");
+
+  try {
+
+    // Rung nhẹ điện thoại
+    if (navigator.vibrate) {
+      navigator.vibrate(200);
+    }
+
+    // =========================
+    // DỪNG QR SCANNER
+    // =========================
+    if (scanner) {
+
+      try {
+        await scanner.stop();
+      } catch(e) {
+        console.warn("scanner.stop lỗi:", e);
       }
+
+      try {
+        scanner.destroy();
+      } catch(e) {
+        console.warn("scanner.destroy lỗi:", e);
+      }
+
+      scanner = null;
+    }
+
+    // =========================
+    // DỪNG TOÀN BỘ CAMERA STREAM
+    // =========================
+    if (currentStream) {
+
+      currentStream.getTracks().forEach(track => {
+        try {
+          track.stop();
+        } catch(e) {}
+      });
+
+      currentStream = null;
+    }
+
+    // =========================
+    // XÓA VIDEO SRC
+    // =========================
+    if (video) {
+      video.pause();
+
+      if (video.srcObject) {
+        video.srcObject = null;
+      }
+
+      video.removeAttribute('src');
+      video.load();
+    }
+
+    // Chờ camera release hoàn toàn
+    await new Promise(resolve => setTimeout(resolve, 300));
+
+    // =========================
+    // GỬI DỮ LIỆU VỀ FORM CHA
+    // =========================
+    if (window.opener && !window.opener.closed) {
+
+      window.opener.postMessage({
+        type: 'qr-scanned',
+        value: code
+      }, '*');
+
+    }
+
+    // =========================
+    // ĐÓNG WEBVIEW / TAB
+    // =========================
+
+    // Zalo Mini App
+    if (window.ZaloJavaScriptInterface) {
+
+      history.back();
+
+    } else {
+
+      // Chrome bình thường
+      window.close();
+
+    }
+
+  } catch(err) {
+
+    console.error("Lỗi khi đóng scanner:", err);
+
+  }
+}
       
       // ========== TĂNG CONTRAST TRÊN CANVAS ==========
       function enhanceContrast(canvasElement, factor = 1.6) {
