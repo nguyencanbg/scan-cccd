@@ -229,20 +229,112 @@
         statusBadge.style.color = isError ? '#ff8888' : '#aaffaa';
       }
       
-      function onCodeFound(code) {
+      // ==================== HÀM xử lý sau khi quét thành công ====================
+      async function onCodeFound(code) {
         if (!scanning) return;
         scanning = false;
-        
-        if (scanner && scanner.stop) scanner.stop();
-        if (currentStream) {
-          currentStream.getTracks().forEach(t => t.stop());
-          currentStream = null;
+
+        setStatus("✅ Đã quét thành công");
+
+        try {
+          // Rung nhẹ điện thoại
+          if (navigator.vibrate) {
+            navigator.vibrate(200);
+          }
+
+          // =========================
+          // DỪNG QR SCANNER
+          // =========================
+          if (scanner) {
+            try {
+              await scanner.stop();
+            } catch(e) {
+              console.warn("scanner.stop lỗi:", e);
+            }
+
+            try {
+              scanner.destroy();
+            } catch(e) {
+              console.warn("scanner.destroy lỗi:", e);
+            }
+
+            scanner = null;
+          }
+
+          // =========================
+          // DỪNG TOÀN BỘ CAMERA STREAM
+          // =========================
+          if (currentStream) {
+            currentStream.getTracks().forEach(track => {
+              try {
+                track.stop();
+              } catch(e) {}
+            });
+            currentStream = null;
+          }
+
+          // =========================
+          // XÓA VIDEO SRC
+          // =========================
+          if (video) {
+            video.pause();
+            if (video.srcObject) {
+              video.srcObject = null;
+            }
+            video.removeAttribute('src');
+            video.load();
+          }
+
+          // Chờ camera release hoàn toàn
+          await new Promise(resolve => setTimeout(resolve, 300));
+
+          // =========================
+          // GỬI DỮ LIỆU VỀ FORM CHA
+          // =========================
+          if (window.opener && !window.opener.closed) {
+            window.opener.postMessage({
+              type: 'qr-scanned',
+              value: code
+            }, '*');
+          }
+
+          // ============================
+          // ĐÓNG SCANNER ĐÚNG CÁCH (theo yêu cầu sửa)
+          // ============================
+
+          // Chrome / Android thường
+          try {
+            window.close();
+          } catch(e) {
+            console.warn("window.close() lỗi:", e);
+          }
+
+          // Zalo Mini App hoặc fallback nếu chưa đóng
+          setTimeout(() => {
+            // Nếu vẫn chưa đóng (cửa sổ vẫn hiển thị)
+            if (!document.hidden) {
+              // Ẩn toàn bộ UI scanner, hiển thị thông báo thành công
+              document.body.innerHTML = `
+                <div style="
+                  height:100vh;
+                  display:flex;
+                  align-items:center;
+                  justify-content:center;
+                  background:#000;
+                  color:#fff;
+                  font-size:20px;
+                  font-family:sans-serif;
+                ">
+                  ✅ Đã quét thành công
+                </div>
+              `;
+            }
+          }, 500);
+
+        } catch(err) {
+          console.error("Lỗi khi đóng scanner:", err);
+          setStatus("❌ Lỗi xử lý sau quét", true);
         }
-        
-        if (window.opener && !window.opener.closed) {
-          window.opener.postMessage({ type: 'qr-scanned', value: code }, '*');
-        }
-        window.close();
       }
       
       // ========== TĂNG CONTRAST TRÊN CANVAS ==========
@@ -346,7 +438,6 @@
               maxScansPerSecond: 15,
               preferredCamera: 'environment',
               returnDetailedScanResult: false,
-              // ---- QUAN TRỌNG: TĂNG CONTRAST TRƯỚC KHI GIẢI MÃ ----
               calculateScanRegion: () => QrScanner.SCAN_DEFAULT_REGION,
               onDecode: (canvasElement) => {
                 // Áp dụng tăng contrast mạnh hơn cho bản in (hệ số 1.6)
@@ -382,10 +473,98 @@
         }
       })();
       
-      document.getElementById('closeBtn').onclick = () => window.close();
-      window.addEventListener('beforeunload', () => {
-        if (scanner && scanner.stop) scanner.stop();
-        if (currentStream) currentStream.getTracks().forEach(t => t.stop());
+      // ==================== SỬA NÚT ĐÓNG (cũng cập nhật theo tinh thần tương tự) ====================
+      document.getElementById('closeBtn').onclick = async () => {
+        scanning = false;
+
+        try {
+          if (scanner) {
+            try {
+              await scanner.stop();
+            } catch(e) {}
+
+            try {
+              scanner.destroy();
+            } catch(e) {}
+
+            scanner = null;
+          }
+
+          if (currentStream) {
+            currentStream.getTracks().forEach(track => {
+              try {
+                track.stop();
+              } catch(e) {}
+            });
+            currentStream = null;
+          }
+
+          if (video) {
+            video.pause();
+            if (video.srcObject) {
+              video.srcObject = null;
+            }
+            video.removeAttribute('src');
+            video.load();
+          }
+        } catch(e) {}
+
+        // Thử đóng cửa sổ (không dùng Zalo specific nữa)
+        try {
+          window.close();
+        } catch(e) {}
+        
+        // Fallback: nếu không đóng được, ẩn UI
+        setTimeout(() => {
+          if (!document.hidden) {
+            document.body.innerHTML = `
+              <div style="
+                height:100vh;
+                display:flex;
+                align-items:center;
+                justify-content:center;
+                background:#000;
+                color:#fff;
+                font-size:20px;
+                font-family:sans-serif;
+              ">
+                👋 Đã đóng trình quét
+              </div>
+            `;
+          }
+        }, 300);
+      };
+      
+      // ==================== beforeunload dọn dẹp tài nguyên ====================
+      window.addEventListener('beforeunload', async () => {
+        scanning = false;
+
+        try {
+          if (scanner) {
+            try {
+              await scanner.stop();
+            } catch(e) {}
+
+            try {
+              scanner.destroy();
+            } catch(e) {}
+
+            scanner = null;
+          }
+
+          if (currentStream) {
+            currentStream.getTracks().forEach(track => {
+              try {
+                track.stop();
+              } catch(e) {}
+            });
+            currentStream = null;
+          }
+
+          if (video && video.srcObject) {
+            video.srcObject = null;
+          }
+        } catch(e) {}
       });
     })();
   </script>
