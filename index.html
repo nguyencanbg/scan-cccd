@@ -3,132 +3,391 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
-  <title>Quét QR CCCD</title>
+  <title>Quét QR CCCD - Đọc được bản in</title>
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { background: #000; font-family: system-ui, sans-serif; height: 100vh; display: flex; flex-direction: column; }
-    .header { background: #d90429; color: white; text-align: center; padding: 15px; font-weight: bold; }
-    .camera-container { flex: 1; position: relative; background: #000; }
-    video { width: 100%; height: 100%; object-fit: cover; }
-    .scan-frame { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 280px; height: 280px; border: 2px solid #4caf50; border-radius: 20px; box-shadow: 0 0 0 100vmax rgba(0,0,0,0.6); }
-    .scan-line { position: absolute; top: 0; left: 0; width: 100%; height: 3px; background: #4caf50; animation: scan 2s linear infinite; }
-    @keyframes scan { 0% { top: 0; } 50% { top: 100%; } 100% { top: 0; } }
-    .controls { padding: 15px; background: #111; display: flex; justify-content: center; }
-    button { background: #d90429; color: white; border: none; padding: 10px 25px; border-radius: 40px; font-weight: bold; cursor: pointer; }
-    .info { text-align: center; padding: 8px; color: #ccc; background: #000; font-size: 13px; }
-    .status { position: absolute; bottom: 20px; left: 20px; background: rgba(0,0,0,0.7); padding: 5px 12px; border-radius: 20px; color: #ffaa44; font-size: 12px; }
-    .toast { position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%); background: #4caf50; color: white; padding: 8px 20px; border-radius: 30px; z-index: 100; animation: fadeOut 2s forwards; }
-    @keyframes fadeOut { 0% { opacity: 1; } 70% { opacity: 1; } 100% { opacity: 0; visibility: hidden; } }
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: #000;
+      font-family: system-ui, 'Segoe UI', -apple-system, sans-serif;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .header {
+      text-align: center;
+      padding: 15px;
+      background: rgba(0,0,0,0.8);
+      backdrop-filter: blur(10px);
+      color: white;
+      font-size: 1.2rem;
+      font-weight: 600;
+      z-index: 10;
+      border-bottom: 1px solid rgba(255,255,255,0.2);
+    }
+
+    .camera-container {
+      flex: 1;
+      position: relative;
+      background: #000;
+      overflow: hidden;
+    }
+
+    video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 20;
+      pointer-events: none;
+    }
+
+    .scan-frame {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 280px;
+      height: 280px;
+      border-radius: 24px;
+      background: transparent;
+      box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.6);
+      border: 2px solid rgba(76, 175, 80, 0.9);
+    }
+
+    .scan-frame::before,
+    .scan-frame::after {
+      content: '';
+      position: absolute;
+      width: 40px;
+      height: 40px;
+      border-color: #4caf50;
+      border-style: solid;
+      border-width: 0;
+    }
+
+    .scan-frame::before {
+      top: -2px;
+      left: -2px;
+      border-top-width: 4px;
+      border-left-width: 4px;
+      border-radius: 8px 0 0 0;
+    }
+
+    .scan-frame::after {
+      bottom: -2px;
+      right: -2px;
+      border-bottom-width: 4px;
+      border-right-width: 4px;
+      border-radius: 0 0 8px 0;
+    }
+
+    .scan-line {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 3px;
+      background: linear-gradient(90deg, transparent, #4caf50, #4caf50, transparent);
+      animation: scan 2s linear infinite;
+      box-shadow: 0 0 6px #4caf50;
+    }
+
+    @keyframes scan {
+      0% { top: 0; }
+      50% { top: 100%; }
+      100% { top: 0; }
+    }
+
+    .controls {
+      padding: 15px;
+      background: rgba(0,0,0,0.8);
+      backdrop-filter: blur(10px);
+      display: flex;
+      justify-content: center;
+      gap: 15px;
+      z-index: 10;
+      border-top: 1px solid rgba(255,255,255,0.2);
+    }
+
+    button {
+      background: #d90429;
+      border: none;
+      color: white;
+      padding: 10px 28px;
+      border-radius: 40px;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: 0.2s;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    }
+
+    button:active {
+      transform: scale(0.96);
+    }
+
+    .info {
+      text-align: center;
+      padding: 8px;
+      font-size: 13px;
+      background: rgba(0,0,0,0.6);
+      color: #ccc;
+      backdrop-filter: blur(4px);
+    }
+
+    .status-badge {
+      position: absolute;
+      bottom: 20px;
+      left: 20px;
+      background: rgba(0,0,0,0.7);
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      color: #ffaa44;
+      z-index: 25;
+      font-family: monospace;
+      pointer-events: none;
+    }
+
+    .loading {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(0,0,0,0.85);
+      backdrop-filter: blur(8px);
+      padding: 16px 24px;
+      border-radius: 40px;
+      color: white;
+      z-index: 30;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 14px;
+      border: 1px solid rgba(255,255,255,0.2);
+    }
+
+    .spinner {
+      width: 20px;
+      height: 20px;
+      border: 2px solid #fff;
+      border-top: 2px solid #4caf50;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
-<div class="header">📷 QUÉT MÃ QR CCCD</div>
-<div class="camera-container">
-  <video id="video" playsinline muted></video>
-  <div class="scan-frame"><div class="scan-line"></div></div>
-  <div class="status" id="status">⚙️ Đang khởi tạo...</div>
-</div>
-<div class="controls">
-  <button id="closeBtn">Đóng</button>
-</div>
-<div class="info">✅ Đưa mã QR vào khung · Tự động đọc</div>
+  <div class="header">📷 QUÉT MÃ QR CCCD - ĐỌC ĐƯỢC BẢN IN</div>
+  <div class="camera-container">
+    <video id="video" playsinline muted></video>
+    <div class="overlay">
+      <div class="scan-frame">
+        <div class="scan-line"></div>
+      </div>
+    </div>
+    <div class="status-badge" id="statusBadge">⚙️ Đang khởi tạo...</div>
+  </div>
+  <div class="controls">
+    <button id="closeBtn">Đóng</button>
+  </div>
+  <div class="info">✅ Đưa mã QR vào khung xanh · Tự động tăng độ tương phản để đọc bản in</div>
+  <div id="loadingMsg" class="loading" style="display: none;">
+    <div class="spinner"></div> Đang xử lý...
+  </div>
 
-<script>
-(function() {
-  let scanner = null;
-  let stream = null;
-  let scanning = true;
-  let scanned = false;
-  const video = document.getElementById('video');
-  const statusDiv = document.getElementById('status');
-  
-  function setStatus(text, isError) {
-    statusDiv.innerHTML = text;
-    statusDiv.style.color = isError ? '#ff8888' : '#aaffaa';
-  }
-  
-  function showToast(msg) {
-    const toast = document.createElement('div');
-    toast.className = 'toast';
-    toast.innerText = msg;
-    document.body.appendChild(toast);
-    setTimeout(() => toast.remove(), 2000);
-  }
-  
-  function onCodeFound(code) {
-    if (!scanning || scanned) return;
-    scanning = false;
-    scanned = true;
-    setStatus("✅ Quét thành công! Nhấn Đóng.");
-    showToast("✅ Quét thành công!");
-    // Lưu vào localStorage để trang cha đọc được
-    localStorage.setItem('qr_scanned_code', code);
-    // Gửi postMessage (nếu opener tồn tại)
-    if (window.opener && !window.opener.closed) {
-      window.opener.postMessage({ type: 'qr-scanned', value: code }, '*');
-    }
-    // Dừng camera
-    if (scanner) {
-      try { scanner.stop(); scanner.destroy(); } catch(e) {}
-      scanner = null;
-    }
-    if (stream) {
-      stream.getTracks().forEach(t => t.stop());
-      stream = null;
-    }
-    if (video && video.srcObject) video.srcObject = null;
-  }
-  
-  // Tăng contrast canvas
-  function enhanceContrast(canvasEl, factor) {
-    const ctx = canvasEl.getContext('2d');
-    const imgData = ctx.getImageData(0, 0, canvasEl.width, canvasEl.height);
-    const data = imgData.data;
-    for (let i = 0; i < data.length; i += 4) {
-      data[i] = Math.min(255, Math.max(0, (data[i] - 128) * factor + 128));
-      data[i+1] = Math.min(255, Math.max(0, (data[i+1] - 128) * factor + 128));
-      data[i+2] = Math.min(255, Math.max(0, (data[i+2] - 128) * factor + 128));
-    }
-    ctx.putImageData(imgData, 0, 0);
-    return canvasEl;
-  }
-  
-  async function startScanner() {
-    try {
-      const QrScanner = (await import('https://cdn.jsdelivr.net/npm/qr-scanner@1.4.2/qr-scanner.min.js')).default;
-      scanner = new QrScanner(video, result => onCodeFound(result.data), {
-        onDecodeError: () => {},
-        highlightScanRegion: true,
-        maxScansPerSecond: 15,
-        preferredCamera: 'environment',
-        onDecode: (canvas) => enhanceContrast(canvas, 1.6)
+  <script>
+    (function() {
+      let scanner = null;
+      let currentStream = null;
+      let scanning = true;
+      let isUsingFallback = false;
+      
+      const video = document.getElementById('video');
+      const statusBadge = document.getElementById('statusBadge');
+      const loadingDiv = document.getElementById('loadingMsg');
+      
+      function setStatus(text, isError = false) {
+        statusBadge.innerHTML = text;
+        statusBadge.style.color = isError ? '#ff8888' : '#aaffaa';
+      }
+      
+      function onCodeFound(code) {
+        if (!scanning) return;
+        scanning = false;
+        
+        if (scanner && scanner.stop) scanner.stop();
+        if (currentStream) {
+          currentStream.getTracks().forEach(t => t.stop());
+          currentStream = null;
+        }
+        
+        if (window.opener && !window.opener.closed) {
+          window.opener.postMessage({ type: 'qr-scanned', value: code }, '*');
+        }
+        window.close();
+      }
+      
+      // ========== TĂNG CONTRAST TRÊN CANVAS ==========
+      function enhanceContrast(canvasElement, factor = 1.6) {
+        const ctx = canvasElement.getContext('2d');
+        const imageData = ctx.getImageData(0, 0, canvasElement.width, canvasElement.height);
+        const data = imageData.data;
+        for (let i = 0; i < data.length; i += 4) {
+          // Tăng contrast cho từng kênh màu
+          data[i]   = Math.min(255, Math.max(0, (data[i] - 128) * factor + 128));
+          data[i+1] = Math.min(255, Math.max(0, (data[i+1] - 128) * factor + 128));
+          data[i+2] = Math.min(255, Math.max(0, (data[i+2] - 128) * factor + 128));
+        }
+        ctx.putImageData(imageData, 0, 0);
+        return canvasElement;
+      }
+      
+      // ========== FALLBACK JSQR (có zoom + tăng contrast) ==========
+      async function startJsQRFallback() {
+        setStatus("🔄 Chế độ dự phòng (jsQR + tăng độ tương phản)");
+        isUsingFallback = true;
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+          });
+          currentStream = stream;
+          video.srcObject = stream;
+          await video.play();
+          setStatus("✅ Camera sẵn sàng (jsQR nâng cao)");
+          
+          if (typeof jsQR === 'undefined') {
+            await new Promise((resolve, reject) => {
+              const script = document.createElement('script');
+              script.src = 'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js';
+              script.onload = resolve;
+              script.onerror = reject;
+              document.head.appendChild(script);
+            });
+          }
+          
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          const ZOOM = 2.0;
+          let lastTime = 0;
+          const interval = 100;
+          
+          function scanFrame() {
+            if (!scanning) return;
+            requestAnimationFrame(async () => {
+              if (!scanning) return;
+              const now = Date.now();
+              if (now - lastTime >= interval && video.readyState === 4 && video.videoWidth > 0) {
+                lastTime = now;
+                const vw = video.videoWidth;
+                const vh = video.videoHeight;
+                const cropW = vw / ZOOM;
+                const cropH = vh / ZOOM;
+                const sx = (vw - cropW) / 2;
+                const sy = (vh - cropH) / 2;
+                canvas.width = vw;
+                canvas.height = vh;
+                ctx.drawImage(video, sx, sy, cropW, cropH, 0, 0, vw, vh);
+                // Tăng contrast trước khi quét
+                enhanceContrast(canvas, 1.5);
+                const imageData = ctx.getImageData(0, 0, vw, vh);
+                const code = jsQR(imageData.data, vw, vh, { inversionAttempts: 'dontInvert' });
+                if (code && scanning) {
+                  onCodeFound(code.data);
+                  return;
+                }
+              }
+              requestAnimationFrame(scanFrame);
+            });
+          }
+          scanFrame();
+          return true;
+        } catch (err) {
+          console.error("Fallback jsQR lỗi:", err);
+          setStatus("❌ Không thể khởi tạo camera", true);
+          return false;
+        }
+      }
+      
+      // ========== QR-SCANNER (chính) với onDecode để tăng contrast ==========
+      async function startQrScanner() {
+        try {
+          const module = await import('https://cdn.jsdelivr.net/npm/qr-scanner@1.4.2/qr-scanner.min.js');
+          const QrScanner = module.default;
+          
+          if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            throw new Error("Trình duyệt không hỗ trợ camera");
+          }
+          
+          scanner = new QrScanner(
+            video,
+            result => onCodeFound(result.data),
+            {
+              onDecodeError: (err) => {},
+              highlightScanRegion: true,
+              highlightCodeOutline: true,
+              maxScansPerSecond: 15,
+              preferredCamera: 'environment',
+              returnDetailedScanResult: false,
+              // ---- QUAN TRỌNG: TĂNG CONTRAST TRƯỚC KHI GIẢI MÃ ----
+              calculateScanRegion: () => QrScanner.SCAN_DEFAULT_REGION,
+              onDecode: (canvasElement) => {
+                // Áp dụng tăng contrast mạnh hơn cho bản in (hệ số 1.6)
+                return enhanceContrast(canvasElement, 1.6);
+              }
+            }
+          );
+          
+          if (QrScanner.hasNativeScanner()) {
+            setStatus('✅ Native Turbo + Tăng contrast - Sẵn sàng');
+          } else {
+            setStatus('✅ ZXing Engine + Tăng contrast - Sẵn sàng');
+          }
+          
+          await scanner.start();
+          return true;
+        } catch (err) {
+          console.warn("qr-scanner thất bại:", err);
+          return false;
+        }
+      }
+      
+      // KHỞI ĐỘNG
+      (async () => {
+        loadingDiv.style.display = 'flex';
+        let success = await startQrScanner();
+        if (!success) {
+          success = await startJsQRFallback();
+        }
+        loadingDiv.style.display = 'none';
+        if (!success) {
+          setStatus("❌ Lỗi: Không thể truy cập camera", true);
+        }
+      })();
+      
+      document.getElementById('closeBtn').onclick = () => window.close();
+      window.addEventListener('beforeunload', () => {
+        if (scanner && scanner.stop) scanner.stop();
+        if (currentStream) currentStream.getTracks().forEach(t => t.stop());
       });
-      setStatus("✅ Sẵn sàng - Quét QR");
-      await scanner.start();
-      stream = video.srcObject;
-      return true;
-    } catch(err) {
-      console.error(err);
-      setStatus("❌ Lỗi camera", true);
-      return false;
-    }
-  }
-  
-  (async () => {
-    await startScanner();
-  })();
-  
-  document.getElementById('closeBtn').onclick = () => {
-    if (scanner) { scanner.stop(); scanner.destroy(); }
-    if (stream) { stream.getTracks().forEach(t => t.stop()); }
-    window.close();
-  };
-  
-  window.addEventListener('beforeunload', () => {
-    if (scanner) scanner.destroy();
-    if (stream) stream.getTracks().forEach(t => t.stop());
-  });
-})();
-</script>
+    })();
+  </script>
 </body>
 </html>
