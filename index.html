@@ -229,12 +229,12 @@
         statusBadge.style.color = isError ? '#ff8888' : '#aaffaa';
       }
       
-      // ==================== SỬA HÀM onCodeFound (async) ====================
+      // ==================== SỬA: chỉ tắt camera, KHÔNG đóng webview ====================
       async function onCodeFound(code) {
         if (!scanning) return;
         scanning = false;
         
-        setStatus("✅ Đã quét thành công");
+        setStatus("✅ Đã quét thành công! Nhấn 'Đóng' để tiếp tục");
         
         try {
           // Rung nhẹ điện thoại
@@ -271,9 +271,6 @@
             video.load();
           }
           
-          // Chờ camera giải phóng hoàn toàn
-          await new Promise(resolve => setTimeout(resolve, 300));
-          
           // Gửi dữ liệu về form cha (nếu có)
           if (window.opener && !window.opener.closed) {
             window.opener.postMessage({
@@ -282,14 +279,12 @@
             }, '*');
           }
           
-          // Đóng webview/tab
-          if (window.ZaloJavaScriptInterface) {
-            history.back();
-          } else {
-            window.close();
-          }
+          // KHÔNG tự động đóng webview nữa
+          // Người dùng sẽ bấm nút "Đóng" để thoát
+          
         } catch(err) {
-          console.error("Lỗi khi đóng scanner:", err);
+          console.error("Lỗi khi dừng camera:", err);
+          setStatus("❌ Lỗi khi dừng camera", true);
         }
       }
       
@@ -424,7 +419,7 @@
         }
       })();
       
-      // ==================== SỬA NÚT ĐÓNG ====================
+      // ==================== NÚT ĐÓNG - đóng webview ====================
       document.getElementById('closeBtn').onclick = async () => {
         scanning = false;
         try {
@@ -444,6 +439,7 @@
             video.load();
           }
         } catch(e) {}
+        // Đóng webview (Zalo Mini App hoặc trình duyệt)
         if (window.ZaloJavaScriptInterface) {
           history.back();
         } else {
