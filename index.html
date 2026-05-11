@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
-  <title>Quét QR CCCD - Đọc được bản in</title>
+  <title>Quét QR CCCD - Đọc bản in</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { background: #000; font-family: system-ui, -apple-system, sans-serif; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
@@ -30,7 +30,7 @@
   </style>
 </head>
 <body>
-  <div class="header">📷 QUÉT MÃ QR CCCD - ĐỌC ĐƯỢC BẢN IN</div>
+  <div class="header">📷 QUÉT MÃ QR CCCD</div>
   <div class="camera-container">
     <video id="video" playsinline muted></video>
     <div class="overlay">
@@ -43,7 +43,7 @@
   <div class="controls">
     <button id="closeBtn">Đóng</button>
   </div>
-  <div class="info">✅ Đưa mã QR vào khung xanh · Tự động tăng độ tương phản để đọc bản in</div>
+  <div class="info">✅ Đưa mã QR vào khung · Tự động tăng độ tương phản</div>
   <div id="loadingMsg" class="loading" style="display: none;">
     <div class="spinner"></div> Đang xử lý...
   </div>
@@ -72,25 +72,39 @@
         setTimeout(() => toast.remove(), 2000);
       }
       
-      // ========== XỬ LÝ KHI QUÉT THÀNH CÔNG ==========
+      function sendCodeToParent(code) {
+        // Ưu tiên dùng postMessage
+        if (window.opener && !window.opener.closed) {
+          window.opener.postMessage({ type: 'qr-scanned', value: code }, '*');
+        }
+        // Dự phòng: lưu vào localStorage, trang chính sẽ đọc
+        localStorage.setItem('qr_scanned_code', code);
+      }
+      
       async function onCodeFound(code) {
         if (!scanning || scanned) return;
         scanning = false;
         scanned = true;
-        setStatus("✅ Quét thành công! Nhấn [Đóng] để quay lại.");
+        setStatus("✅ Quét thành công! Nhấn [Đóng] để tiếp tục.");
         showToast("✅ Quét thành công! Nhấn Đóng để quay lại.");
-        
-        // Gửi dữ liệu về trang cha (nếu mở bằng window.open)
-        if (window.opener && !window.opener.closed) {
-          window.opener.postMessage({ type: 'qr-scanned', value: code }, '*');
-        } else {
-          // fallback: lưu vào localStorage (đề phòng)
-          localStorage.setItem('qr_scanned_code', code);
+        sendCodeToParent(code);
+        // Dừng scanner và giải phóng camera
+        if (scanner) {
+          try { await scanner.stop(); } catch(e) {}
+          try { scanner.destroy(); } catch(e) {}
+          scanner = null;
+        }
+        if (currentStream) {
+          currentStream.getTracks().forEach(t => { try { t.stop(); } catch(e) {} });
+          currentStream = null;
+        }
+        if (video && video.srcObject) {
+          video.srcObject = null;
         }
         // KHÔNG TỰ ĐỘNG ĐÓNG - để người dùng nhấn nút Đóng
       }
       
-      // ========== TĂNG CONTRAST TRÊN CANVAS ==========
+      // Tăng contrast
       function enhanceContrast(canvasElement, factor = 1.6) {
         const ctx = canvasElement.getContext('2d');
         const imageData = ctx.getImageData(0, 0, canvasElement.width, canvasElement.height);
@@ -104,9 +118,9 @@
         return canvasElement;
       }
       
-      // ========== FALLBACK JSQR ==========
+      // Fallback jsQR
       async function startJsQRFallback() {
-        setStatus("🔄 Chế độ dự phòng (jsQR + tăng độ tương phản)");
+        setStatus("🔄 Chế độ dự phòng (jsQR + tăng contrast)");
         try {
           const stream = await navigator.mediaDevices.getUserMedia({
             video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
@@ -114,7 +128,7 @@
           currentStream = stream;
           video.srcObject = stream;
           await video.play();
-          setStatus("✅ Camera sẵn sàng (jsQR nâng cao)");
+          setStatus("✅ Camera sẵn sàng (jsQR)");
           
           if (typeof jsQR === 'undefined') {
             await new Promise((resolve, reject) => {
@@ -168,7 +182,7 @@
         }
       }
       
-      // ========== QR-SCANNER CHÍNH ==========
+      // QR Scanner chính
       async function startQrScanner() {
         try {
           const module = await import('https://cdn.jsdelivr.net/npm/qr-scanner@1.4.2/qr-scanner.min.js');
@@ -182,7 +196,7 @@
             video,
             result => onCodeFound(result.data),
             {
-              onDecodeError: (err) => {},
+              onDecodeError: () => {},
               highlightScanRegion: true,
               highlightCodeOutline: true,
               maxScansPerSecond: 15,
@@ -193,12 +207,7 @@
             }
           );
           
-          if (QrScanner.hasNativeScanner()) {
-            setStatus('✅ Native Turbo + Tăng contrast - Sẵn sàng');
-          } else {
-            setStatus('✅ ZXing Engine + Tăng contrast - Sẵn sàng');
-          }
-          
+          setStatus('✅ Sẵn sàng - Quét QR');
           await scanner.start();
           return true;
         } catch (err) {
@@ -207,43 +216,28 @@
         }
       }
       
-      // KHỞI ĐỘNG
+      // Khởi động
       (async () => {
         loadingDiv.style.display = 'flex';
         let success = await startQrScanner();
         if (!success) success = await startJsQRFallback();
         loadingDiv.style.display = 'none';
-        if (!success) {
-          setStatus("❌ Lỗi: Không thể truy cập camera", true);
-        }
+        if (!success) setStatus("❌ Không thể truy cập camera", true);
       })();
       
-      // ========== NÚT ĐÓNG (đóng popup an toàn) ==========
-      document.getElementById('closeBtn').onclick = async () => {
-        scanning = false;
-        if (scanner) {
-          try { await scanner.stop(); } catch(e) {}
-          try { scanner.destroy(); } catch(e) {}
-          scanner = null;
-        }
-        if (currentStream) {
-          currentStream.getTracks().forEach(t => { try { t.stop(); } catch(e) {} });
-          currentStream = null;
-        }
-        if (video && video.srcObject) {
-          video.srcObject = null;
-        }
-        // Chỉ đóng popup, không can thiệp gì thêm
+      // Nút đóng (đóng popup an toàn)
+      document.getElementById('closeBtn').onclick = () => {
+        // Dọn dẹp, dừng camera
+        if (scanner) { scanner.stop(); scanner.destroy(); scanner = null; }
+        if (currentStream) { currentStream.getTracks().forEach(t => t.stop()); currentStream = null; }
+        if (video && video.srcObject) { video.srcObject = null; }
+        // Chỉ đóng popup
         window.close();
       };
       
       window.addEventListener('beforeunload', () => {
-        if (scanner) {
-          try { scanner.stop(); scanner.destroy(); } catch(e) {}
-        }
-        if (currentStream) {
-          currentStream.getTracks().forEach(t => { try { t.stop(); } catch(e) {} });
-        }
+        if (scanner) { scanner.stop(); scanner.destroy(); }
+        if (currentStream) { currentStream.getTracks().forEach(t => t.stop()); }
       });
     })();
   </script>
