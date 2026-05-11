@@ -289,47 +289,14 @@
           await new Promise(resolve => setTimeout(resolve, 300));
 
           // =========================
-          // GỬI DỮ LIỆU VỀ FORM CHA
+          // LƯU DỮ LIỆU QR VÀO SESSIONSTORAGE (thay cho postMessage)
           // =========================
-          if (window.opener && !window.opener.closed) {
-            window.opener.postMessage({
-              type: 'qr-scanned',
-              value: code
-            }, '*');
-          }
+          sessionStorage.setItem('qr_scanned_data', code);
 
           // ============================
-          // ĐÓNG SCANNER ĐÚNG CÁCH (theo yêu cầu sửa)
+          // QUAY LẠI TRANG TRƯỚC (thay cho window.close)
           // ============================
-
-          // Chrome / Android thường
-          try {
-            window.close();
-          } catch(e) {
-            console.warn("window.close() lỗi:", e);
-          }
-
-          // Zalo Mini App hoặc fallback nếu chưa đóng
-          setTimeout(() => {
-            // Nếu vẫn chưa đóng (cửa sổ vẫn hiển thị)
-            if (!document.hidden) {
-              // Ẩn toàn bộ UI scanner, hiển thị thông báo thành công
-              document.body.innerHTML = `
-                <div style="
-                  height:100vh;
-                  display:flex;
-                  align-items:center;
-                  justify-content:center;
-                  background:#000;
-                  color:#fff;
-                  font-size:20px;
-                  font-family:sans-serif;
-                ">
-                  ✅ Đã quét thành công
-                </div>
-              `;
-            }
-          }, 500);
+          history.back();
 
         } catch(err) {
           console.error("Lỗi khi đóng scanner:", err);
@@ -473,7 +440,7 @@
         }
       })();
       
-      // ==================== SỬA NÚT ĐÓNG (cũng cập nhật theo tinh thần tương tự) ====================
+      // ==================== NÚT ĐÓNG (cập nhật dùng history.back) ====================
       document.getElementById('closeBtn').onclick = async () => {
         scanning = false;
 
@@ -509,30 +476,8 @@
           }
         } catch(e) {}
 
-        // Thử đóng cửa sổ (không dùng Zalo specific nữa)
-        try {
-          window.close();
-        } catch(e) {}
-        
-        // Fallback: nếu không đóng được, ẩn UI
-        setTimeout(() => {
-          if (!document.hidden) {
-            document.body.innerHTML = `
-              <div style="
-                height:100vh;
-                display:flex;
-                align-items:center;
-                justify-content:center;
-                background:#000;
-                color:#fff;
-                font-size:20px;
-                font-family:sans-serif;
-              ">
-                👋 Đã đóng trình quét
-              </div>
-            `;
-          }
-        }, 300);
+        // Quay lại trang trước
+        history.back();
       };
       
       // ==================== beforeunload dọn dẹp tài nguyên ====================
